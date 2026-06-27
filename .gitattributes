@@ -1,0 +1,38 @@
+# 仓库文本规范:统一 UTF-8 + LF。
+#
+# 说明:Git 以原始字节存储、不对内容转码,本仓库文件本身均为 UTF-8(无需也
+# 无法用 gitattributes 强制转码;若要在编辑器层面声明 charset=utf-8,请用
+# .editorconfig)。此处用 `eol=lf` 固定换行为 LF——即便在 Windows 上签出也
+# 不转成 CRLF,从而消除 "LF will be replaced by CRLF" 告警,保证跨平台一致。
+
+# 默认:自动识别文本,统一以 LF 存储与签出
+* text=auto eol=lf
+
+# 源码与配置(显式标注,避免被误判为二进制)
+*.hpp          text eol=lf
+*.cpp          text eol=lf
+*.c            text eol=lf
+*.h            text eol=lf
+*.md           text eol=lf
+*.py           text eol=lf
+*.sh           text eol=lf
+*.json         text eol=lf
+*.ld           text eol=lf
+*.S            text eol=lf
+*.s            text eol=lf
+SConstruct     text eol=lf
+SConscript     text eol=lf
+.clangd        text eol=lf
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+
+# 二进制:一律不做换行/编码转换
+*.o    binary
+*.obj  binary
+*.elf  binary
+*.bin  binary
+*.a    binary
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.pdf  binary
