@@ -1,0 +1,10 @@
+# 编辑器/IDE文件
+.vs
+.vscode
+.claude
+.cache
+
+# 构建与测试产物(SCons)
+/build/
+/compile_commands.json
+/.sconsign.dblite

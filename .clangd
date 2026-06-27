@@ -1,0 +1,18 @@
+# clangd 项目配置(随仓库提交,机器无关:路径全部相对仓库根)。
+#
+# 主来源是 `scons` 生成的 compile_commands.json —— 其中含主机侧每个测试 TU 的
+# 精确编译命令(clang++ -std=c++23 + 正确的 -I)。下面的 CompileFlags.Add 仅为
+# *未收录进数据库* 的文件(直接打开的库头、Negative/ 与 Target/ 用例)补上头文件
+# 搜索路径与语言标准;它是追加,不会覆盖数据库里的条目。
+#
+# 注意:相对 -I 路径按 compile_commands.json 的 directory 字段(仓库根)解析,
+# 而非按本文件位置解析(clangd 行为)。故此处用仓库根相对路径即可跨机器通用。
+# 不在此设置 --query-driver / -target / -mcpu:数据库只含主机 clang 条目,目标侧
+# 交叉编译由 SConstruct 负责,clangd 无需了解 ARM 工具链。
+
+CompileFlags:
+  Add:
+    - -std=c++23
+    - -IHardware/CoreAbstract
+    - -ITests/Hardware/CoreAbstract/TestSupport
+  CompilationDatabase: .
