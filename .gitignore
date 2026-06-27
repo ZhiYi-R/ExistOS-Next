@@ -2,6 +2,7 @@
 .vs
 .vscode
 .claude
+.claude.json
 .cache
 
 # 构建与测试产物(SCons)
