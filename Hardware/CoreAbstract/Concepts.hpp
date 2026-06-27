@@ -34,24 +34,50 @@ struct PrivilegedModeTag {
 };
 
 /**
- * @brief 统一寄存器后端概念。
+ * @brief 可读后端概念。
  *
- * 任何提供 ValueType + 按值 Read() + 单参 Write(ValueType)(均 noexcept)
- * 的类型都是一个 Backend。Field 模板对任意 Backend 一致工作。
- *
- * 满足者:MMIO Register、CP15 的 RW 寄存器、CPSR。
- * 有意不满足者:SPSR(USR/SYS 下读取 UNPREDICTABLE)、CP15 只写命令、
- *              CP15 test-clean(写 CPSR 标志而非寄存器值)。
+ * 任何提供 ValueType + 按值 Read()(noexcept)的类型。Field 的读侧操作
+ * (Read/ReadRaw/IsSet/IsValue)只需后端可读即可绑定,因此只读 MMIO/CP15
+ * 寄存器也能拥有强类型字段。
  *
  * @tparam RegisterBackend 待检测的后端类型。
  */
 template <typename RegisterBackend>
-concept Backend = requires {
+concept ReadableBackend = requires {
     typename RegisterBackend::ValueType;
     requires std::unsigned_integral<typename RegisterBackend::ValueType>;
     { RegisterBackend::Read() } noexcept -> std::same_as<typename RegisterBackend::ValueType>;
+};
+
+/**
+ * @brief 可写后端概念。
+ *
+ * 任何提供 ValueType + 单参 Write(ValueType)(noexcept)的类型。
+ *
+ * @tparam RegisterBackend 待检测的后端类型。
+ */
+template <typename RegisterBackend>
+concept WritableBackend = requires {
+    typename RegisterBackend::ValueType;
+    requires std::unsigned_integral<typename RegisterBackend::ValueType>;
     { RegisterBackend::Write(std::declval<typename RegisterBackend::ValueType>()) } noexcept;
 };
+
+/**
+ * @brief 统一寄存器后端概念(可读且可写)。
+ *
+ * 同时满足 ReadableBackend 与 WritableBackend:提供 ValueType + 按值 Read()
+ * + 单参 Write(ValueType)(均 noexcept)。Field 的写类/读改写(RMW)操作
+ * (Write/Set/Clear/Toggle)以及 WriteFields 都要求 Backend。
+ *
+ * 满足者:MMIO Register、CP15 的 RW 寄存器、CPSR。
+ * 有意不满足者:SPSR(USR/SYS 下读取 UNPREDICTABLE)、只读 CP15 寄存器
+ *              (MainID/CacheType…,仅可读)、CP15 只写命令、test-clean。
+ *
+ * @tparam RegisterBackend 待检测的后端类型。
+ */
+template <typename RegisterBackend>
+concept Backend = ReadableBackend<RegisterBackend> && WritableBackend<RegisterBackend>;
 
 /**
  * @brief 带 Set/Clear/Toggle 原子位别名的后端。

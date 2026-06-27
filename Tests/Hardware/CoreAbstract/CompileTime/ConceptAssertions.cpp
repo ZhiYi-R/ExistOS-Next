@@ -82,6 +82,34 @@ static_assert(Field<PlainReadWrite, 0, 8>::GetMask() == 0xFFu);
 static_assert(Field<SCTLR, 0, 1>::GetMask() == 0x1u);
 static_assert(Field<Cpsr, 31, 1>::GetMask() == 0x80000000u);
 
+/* ============ Readable / Writable Backend 拆分满足性 ============ */
+static_assert(ReadableBackend<PlainReadWrite> && WritableBackend<PlainReadWrite>,
+              "RW MMIO 既可读也可写");
+static_assert(ReadableBackend<PlainReadOnly> && !WritableBackend<PlainReadOnly>,
+              "RO MMIO 仅可读");
+static_assert(!ReadableBackend<PlainWriteOnly> && WritableBackend<PlainWriteOnly>,
+              "WO MMIO 仅可写");
+static_assert(ReadableBackend<MainID> && !WritableBackend<MainID>,
+              "只读 CP15 MainID 仅可读");
+
+/* ====== Field 绑定只读后端:可绑定、读类可用、写类被门控掉 ====== */
+template <typename FieldType>
+concept FieldExposesRead = requires { FieldType::Read(); };
+template <typename FieldType>
+concept FieldExposesWrite =
+    requires(typename FieldType::ValueType value) { FieldType::Write(value); };
+
+using ReadOnlyMmioField = Field<PlainReadOnly, 0, 8>;
+using MainIdField = Field<MainID, 0, 4>; // 只读 CP15 寄存器也能绑定字段
+static_assert(ReadOnlyMmioField::GetMask() == 0xFFu, "只读后端字段掩码照常 consteval");
+static_assert(FieldExposesRead<ReadOnlyMmioField> && !FieldExposesWrite<ReadOnlyMmioField>,
+              "只读后端的 Field 只暴露读、不暴露写");
+static_assert(FieldExposesRead<MainIdField> && !FieldExposesWrite<MainIdField>,
+              "只读 CP15 字段只可读");
+static_assert(FieldExposesRead<Field<PlainReadWrite, 0, 8>> &&
+                  FieldExposesWrite<Field<PlainReadWrite, 0, 8>>,
+              "RW 后端的 Field 读写皆可用");
+
 } // namespace
 
 int main() { return 0; }

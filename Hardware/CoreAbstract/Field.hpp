@@ -14,21 +14,23 @@ namespace LowLevel {
 /**
  * @brief 强类型位域(模板类)。
  *
- * 绑定到一个 Backend(MMIO Register / CP15 寄存器 / CPSR),用编译期已知的
+ * 绑定到一个后端(MMIO Register / CP15 寄存器 / CPSR),用编译期已知的
  * 偏移/位宽描述一个字段。对外提供 consteval 的 GetMask(),以及零开销的
- * 读/写/置位/清位/翻转。
+ * 读/写/置位/清位/翻转。各操作按后端能力门控:读类(Read/ReadRaw/IsSet/
+ * IsValue)只需后端可读,故只读寄存器也能拥有强类型字段;写类与读改写
+ * (Write/Set/Clear/Toggle)要求后端可读且可写。
  *
  * @note Set/Clear/Toggle/Write 在 ARMv5 上是"读-改-写",非原子(本核无
  *       LDREX/STREX)。需要原子时用 Set/Clear/Toggle 别名或 CriticalSection。
  *
- * @tparam RegisterBackend 后端寄存器类型(须满足 Backend)。
+ * @tparam RegisterBackend 后端寄存器类型(须可读或可写)。
  * @tparam Offset          字段最低位。
  * @tparam Width           字段位宽。
  * @tparam FieldValueType  字段值的强类型(默认与寄存器同宽的无符号整型,可传枚举)。
  */
 template <typename RegisterBackend, uint32_t Offset, uint32_t Width,
           typename FieldValueType = typename RegisterBackend::ValueType>
-    requires Backend<RegisterBackend>
+    requires(ReadableBackend<RegisterBackend> || WritableBackend<RegisterBackend>)
 struct Field {
     using BackendType = RegisterBackend;                       /**< 所属后端 */
     using RegisterType = typename RegisterBackend::ValueType;  /**< 寄存器底层无符号整型 */
@@ -68,7 +70,9 @@ struct Field {
      * @brief 读取字段并右移归位:ldr/mrc + and + lsr。
      * @return 字段当前值。
      */
-    [[gnu::always_inline]] [[nodiscard]] static ValueType Read() noexcept {
+    [[gnu::always_inline]] [[nodiscard]] static ValueType Read() noexcept
+        requires ReadableBackend<RegisterBackend>
+    {
         return static_cast<ValueType>((RegisterBackend::Read() & GetMask()) >> BitOffset);
     }
 
@@ -76,7 +80,9 @@ struct Field {
      * @brief 读取字段的原始掩码值(仍在原位,便于按位合并)。
      * @return 寄存器读数与字段掩码相与的结果。
      */
-    [[gnu::always_inline]] [[nodiscard]] static RegisterType ReadRaw() noexcept {
+    [[gnu::always_inline]] [[nodiscard]] static RegisterType ReadRaw() noexcept
+        requires ReadableBackend<RegisterBackend>
+    {
         return RegisterBackend::Read() & GetMask();
     }
 
@@ -84,23 +90,31 @@ struct Field {
      * @brief 写入字段值(非原子 RMW:读 + bic + orr + 写)。
      * @param value 待写入的字段值。
      */
-    [[gnu::always_inline]] static void Write(ValueType value) noexcept {
+    [[gnu::always_inline]] static void Write(ValueType value) noexcept
+        requires Backend<RegisterBackend>
+    {
         RegisterBackend::Write(static_cast<RegisterType>(
             (RegisterBackend::Read() & ~GetMask()) | Shifted(value)));
     }
 
     /** @brief 整字段置 1(非原子 RMW,3 指令)。 */
-    [[gnu::always_inline]] static void Set() noexcept {
+    [[gnu::always_inline]] static void Set() noexcept
+        requires Backend<RegisterBackend>
+    {
         RegisterBackend::Write(static_cast<RegisterType>(RegisterBackend::Read() | GetMask()));
     }
 
     /** @brief 整字段清 0(非原子 RMW,3 指令)。 */
-    [[gnu::always_inline]] static void Clear() noexcept {
+    [[gnu::always_inline]] static void Clear() noexcept
+        requires Backend<RegisterBackend>
+    {
         RegisterBackend::Write(static_cast<RegisterType>(RegisterBackend::Read() & ~GetMask()));
     }
 
     /** @brief 整字段翻转(非原子 RMW,3 指令)。 */
-    [[gnu::always_inline]] static void Toggle() noexcept {
+    [[gnu::always_inline]] static void Toggle() noexcept
+        requires Backend<RegisterBackend>
+    {
         RegisterBackend::Write(static_cast<RegisterType>(RegisterBackend::Read() ^ GetMask()));
     }
 
@@ -108,7 +122,9 @@ struct Field {
      * @brief 字段是否非零。
      * @return 字段任一位为 1 时返回 true。
      */
-    [[gnu::always_inline]] [[nodiscard]] static bool IsSet() noexcept {
+    [[gnu::always_inline]] [[nodiscard]] static bool IsSet() noexcept
+        requires ReadableBackend<RegisterBackend>
+    {
         return (RegisterBackend::Read() & GetMask()) != 0;
     }
 
@@ -117,7 +133,9 @@ struct Field {
      * @param value 期望值。
      * @return 相等时返回 true。
      */
-    [[gnu::always_inline]] [[nodiscard]] static bool IsValue(ValueType value) noexcept {
+    [[gnu::always_inline]] [[nodiscard]] static bool IsValue(ValueType value) noexcept
+        requires ReadableBackend<RegisterBackend>
+    {
         return Read() == value;
     }
 };

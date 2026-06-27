@@ -27,6 +27,7 @@ import subprocess
 # 路径常量(全部相对仓库根,保证 compile_commands.json 机器无关)
 # ============================================================================
 LIBRARY_INCLUDE = "Hardware/CoreAbstract"
+REGISTERS_INCLUDE = "Hardware/Registers"
 TEST_SUPPORT_INCLUDE = "Tests/Hardware/CoreAbstract/TestSupport"
 
 TEST_BASE = Dir("#Tests/Hardware/CoreAbstract")
@@ -35,6 +36,7 @@ COMPILE_TIME_DIR = TEST_BASE.Dir("CompileTime")
 NEGATIVE_DIR = TEST_BASE.Dir("Negative")
 TARGET_DIR = TEST_BASE.Dir("Target")
 LIBRARY_DIR = Dir("#" + LIBRARY_INCLUDE)
+REGISTERS_DIR = Dir("#" + REGISTERS_INCLUDE)
 BUILD_DIR = Dir("#build")
 
 # 受测的五个头(用于目标侧"逐头自洽"编译)。
@@ -385,6 +387,24 @@ if haveTargetToolchain:
             BUILD_DIR.Dir("SelfContained").File(header + ".passed"), generatedSource)
         targetEnv.AlwaysBuild(passed)
         targetNodes.append(passed)
+
+    # 生成的寄存器层自洽:汇总头 Registers.hpp 含全部外设,以 -Werror 编为目标 .o,
+    # 确保 SVD 重新生成后整套实例化在目标编译器下仍零警告通过。
+    registersEnv = targetEnv.Clone()
+    registersEnv.Append(CXXFLAGS=["-I", REGISTERS_INCLUDE])
+    registersProbe = BUILD_DIR.Dir("SelfContained").File("Registers.cpp")
+
+    def writeRegistersProbe(target, source, env):
+        with open(target[0].abspath, "w") as out:
+            out.write('#include "Registers.hpp"\nint main() { return 0; }\n')
+        return 0
+
+    registersEnv.Command(registersProbe, REGISTERS_DIR.File("Registers.hpp"),
+                         Action(writeRegistersProbe, "生成自洽探针 Registers.hpp"))
+    registersPassed = registersEnv.TargetCompileOnly(
+        BUILD_DIR.Dir("SelfContained").File("Registers.passed"), registersProbe)
+    registersEnv.AlwaysBuild(registersPassed)
+    targetNodes.append(registersPassed)
 else:
     print("注意:未找到 %s,跳过目标侧零开销验证。" % targetEnv["CXX"])
 
