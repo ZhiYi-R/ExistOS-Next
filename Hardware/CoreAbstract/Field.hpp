@@ -1,6 +1,7 @@
 #ifndef EXIST_OS_NEXT_CORE_ABSTRACT_FIELD
 #define EXIST_OS_NEXT_CORE_ABSTRACT_FIELD
 
+#include "Bit.hpp"
 #include "Concepts.hpp"
 #include <cstdint>
 
@@ -26,11 +27,11 @@ namespace LowLevel {
  * 读/写/置/清/翻转一律经所属寄存器的 ReadField/WriteField/... 完成(见 FieldAccess)。
  *
  * @tparam RegisterBackend 所属后端寄存器类型(须可读或可写)。
- * @tparam Offset          字段最低位。
+ * @tparam Offset          字段最低位(强类型位索引 Bit,杜绝裸位号)。
  * @tparam Width           字段位宽。
  * @tparam FieldValueType  字段值的强类型(默认与寄存器同宽的无符号整型,可传枚举)。
  */
-template <typename RegisterBackend, uint32_t Offset, uint32_t Width,
+template <typename RegisterBackend, Bit Offset, uint32_t Width,
           typename FieldValueType = typename RegisterBackend::ValueType>
     requires(ReadableBackend<RegisterBackend> || WritableBackend<RegisterBackend>)
 struct Field {
@@ -38,8 +39,8 @@ struct Field {
     using RegisterType = typename RegisterBackend::ValueType; /**< 寄存器底层无符号整型 */
     using ValueType = FieldValueType;                         /**< 字段值的强类型 */
 
-    static constexpr uint32_t BitOffset = Offset; /**< 字段最低位 */
-    static constexpr uint32_t BitWidth = Width;   /**< 字段位宽 */
+    static constexpr uint32_t BitOffset = static_cast<uint32_t>(Offset); /**< 字段最低位 */
+    static constexpr uint32_t BitWidth = Width;                          /**< 字段位宽 */
 
     static_assert(BitWidth >= 1, "Field 位宽至少为 1");
     static_assert(BitOffset + BitWidth <= sizeof(RegisterType) * 8,

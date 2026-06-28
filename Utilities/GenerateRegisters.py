@@ -163,7 +163,7 @@ def RenderField(field, lines):
             lines.append("            %s = 0x%X,%s" % (enumName, enumValue, trailing))
         lines.append("        };")
 
-    aliasText = "        using %s = LowLevel::Field<Reg, %d, %d, %s>;" % (
+    aliasText = "        using %s = LowLevel::Field<Reg, LowLevel::Bit::Bit%d, %d, %s>;" % (
         field.name, field.bitOffset, field.bitWidth, valueType)
     if field.description:
         aliasText += " /**< %s */" % field.description

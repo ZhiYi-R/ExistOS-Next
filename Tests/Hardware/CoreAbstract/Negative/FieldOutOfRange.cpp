@@ -10,7 +10,7 @@
 
 using namespace LowLevel;
 using DemoRegister = Register<std::uint32_t, 0x1000>;
-using OutOfRangeField = Field<DemoRegister, 30, 4>; // 30 + 4 = 34 > 32
+using OutOfRangeField = Field<DemoRegister, Bit::Bit30, 4>; // 30 + 4 = 34 > 32
 
 int main() {
     (void)OutOfRangeField::GetMask(); // 实例化以触发 static_assert

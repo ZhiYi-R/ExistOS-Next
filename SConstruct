@@ -40,7 +40,7 @@ REGISTERS_DIR = Dir("#" + REGISTERS_INCLUDE)
 BUILD_DIR = Dir("#build")
 
 # 受测的五个头(用于目标侧"逐头自洽"编译)。
-LIBRARY_HEADERS = ["Concepts", "Field", "Register", "PSR", "CP15"]
+LIBRARY_HEADERS = ["Bit", "Concepts", "Field", "Register", "PSR", "CP15"]
 
 # 目标侧编译标志:ARM926EJ-S / ARMv5TEJ。
 TARGET_ARCH_FLAGS = ["-march=armv5te", "-mcpu=arm926ej-s", "-ffreestanding"]

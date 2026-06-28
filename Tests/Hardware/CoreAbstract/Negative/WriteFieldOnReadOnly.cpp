@@ -11,7 +11,7 @@
 #include "Field.hpp"
 
 using namespace LowLevel;
-using ReadOnlyField = Field<MainID, 0, 4>; // MainID 只读:绑定合法,仅可读
+using ReadOnlyField = Field<MainID, Bit::Bit0, 4>; // MainID 只读:绑定合法,仅可读
 
 int main() {
     MainID::WriteField<ReadOnlyField>(0x1u); // 期望:此处不可编译(只读后端无写能力)

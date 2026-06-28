@@ -10,7 +10,7 @@
 #include <cstdint>
 
 using namespace LowLevel;
-using IllegalField = Field<Spsr, 0, 5>; // Spsr 非 Backend
+using IllegalField = Field<Spsr, Bit::Bit0, 5>; // Spsr 非 Backend
 
 int main() {
     (void)sizeof(IllegalField); // 实例化以触发约束失败

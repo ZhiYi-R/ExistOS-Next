@@ -21,22 +21,22 @@ using namespace LowLevel;
 using DemoRegister = Register<std::uint32_t, 0x1000>;
 
 /* =========================== GetMask 基本规律 =========================== */
-static_assert(Field<DemoRegister, 0, 1>::GetMask() == 0x00000001u);
-static_assert(Field<DemoRegister, 4, 3>::GetMask() == 0x00000070u);
-static_assert(Field<DemoRegister, 8, 8>::GetMask() == 0x0000FF00u);
-static_assert(Field<DemoRegister, 31, 1>::GetMask() == 0x80000000u);
-static_assert(Field<DemoRegister, 16, 16>::GetMask() == 0xFFFF0000u);
-static_assert(Field<DemoRegister, 0, 32>::GetMask() == 0xFFFFFFFFu, "满宽边界");
+static_assert(Field<DemoRegister, Bit::Bit0, 1>::GetMask() == 0x00000001u);
+static_assert(Field<DemoRegister, Bit::Bit4, 3>::GetMask() == 0x00000070u);
+static_assert(Field<DemoRegister, Bit::Bit8, 8>::GetMask() == 0x0000FF00u);
+static_assert(Field<DemoRegister, Bit::Bit31, 1>::GetMask() == 0x80000000u);
+static_assert(Field<DemoRegister, Bit::Bit16, 16>::GetMask() == 0xFFFF0000u);
+static_assert(Field<DemoRegister, Bit::Bit0, 32>::GetMask() == 0xFFFFFFFFu, "满宽边界");
 
 /* u16 寄存器的满宽边界 */
 using DemoHalfword = Register<std::uint16_t, 0x1000>;
-static_assert(Field<DemoHalfword, 0, 16>::GetMask() == 0xFFFFu, "u16 满宽");
-static_assert(Field<DemoHalfword, 12, 4>::GetMask() == 0xF000u);
+static_assert(Field<DemoHalfword, Bit::Bit0, 16>::GetMask() == 0xFFFFu, "u16 满宽");
+static_assert(Field<DemoHalfword, Bit::Bit12, 4>::GetMask() == 0xF000u);
 
 /* ============================== Shifted ============================== */
-static_assert(Field<DemoRegister, 4, 3>::Shifted(0x5u) == 0x50u);
-static_assert(Field<DemoRegister, 4, 3>::Shifted(0xFu) == 0x70u, "超宽位被截断");
-static_assert(Field<DemoRegister, 0, 8>::Shifted(0xABu) == 0xABu);
+static_assert(Field<DemoRegister, Bit::Bit4, 3>::Shifted(0x5u) == 0x50u);
+static_assert(Field<DemoRegister, Bit::Bit4, 3>::Shifted(0xFu) == 0x70u, "超宽位被截断");
+static_assert(Field<DemoRegister, Bit::Bit0, 8>::Shifted(0xABu) == 0xABu);
 
 /* ============================ SCTLR 位布局 ============================ */
 static_assert(SCTLR::MmuEnable::GetMask() == (1u << 0));

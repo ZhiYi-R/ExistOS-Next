@@ -25,8 +25,8 @@ struct BackendB : FieldAccess<BackendB> {
 };
 } // namespace
 
-using FieldA = Field<BackendA, 0, 4>;
-using FieldB = Field<BackendB, 8, 4>; // 属于 BackendB
+using FieldA = Field<BackendA, Bit::Bit0, 4>;
+using FieldB = Field<BackendB, Bit::Bit8, 4>; // 属于 BackendB
 
 int main() {
     // FieldB 不属于 BackendA,违反"所有字段必须属于本寄存器"约束。

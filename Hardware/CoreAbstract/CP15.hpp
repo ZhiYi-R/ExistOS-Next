@@ -39,17 +39,17 @@ struct SCTLR : FieldAccess<SCTLR> {
         asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r"(value) : "memory");
     }
 
-    using MmuEnable = Field<SCTLR, 0, 1>;               /**< M:MMU 使能 */
-    using AlignmentCheckEnable = Field<SCTLR, 1, 1>;    /**< A:对齐检查使能 */
-    using DataCacheEnable = Field<SCTLR, 2, 1>;         /**< C:D-cache 使能 */
-    using WriteBufferEnable = Field<SCTLR, 3, 1>;       /**< W:写缓冲使能 */
-    using BigEndian = Field<SCTLR, 7, 1>;               /**< B:大端 */
-    using SystemProtection = Field<SCTLR, 8, 1>;        /**< S:系统保护 */
-    using RomProtection = Field<SCTLR, 9, 1>;           /**< R:ROM 保护 */
-    using InstructionCacheEnable = Field<SCTLR, 12, 1>; /**< I:I-cache 使能 */
-    using HighVectors = Field<SCTLR, 13, 1>;            /**< V:高位异常向量(0xFFFF0000) */
-    using RoundRobinReplacement = Field<SCTLR, 14, 1>;  /**< RR:round-robin 替换 */
-    using ThumbInterworkingDisable = Field<SCTLR, 15, 1>; /**< L4:抑制加载到 PC 时切 Thumb */
+    using MmuEnable = Field<SCTLR, Bit::Bit0, 1>;               /**< M:MMU 使能 */
+    using AlignmentCheckEnable = Field<SCTLR, Bit::Bit1, 1>;    /**< A:对齐检查使能 */
+    using DataCacheEnable = Field<SCTLR, Bit::Bit2, 1>;         /**< C:D-cache 使能 */
+    using WriteBufferEnable = Field<SCTLR, Bit::Bit3, 1>;       /**< W:写缓冲使能 */
+    using BigEndian = Field<SCTLR, Bit::Bit7, 1>;               /**< B:大端 */
+    using SystemProtection = Field<SCTLR, Bit::Bit8, 1>;        /**< S:系统保护 */
+    using RomProtection = Field<SCTLR, Bit::Bit9, 1>;           /**< R:ROM 保护 */
+    using InstructionCacheEnable = Field<SCTLR, Bit::Bit12, 1>; /**< I:I-cache 使能 */
+    using HighVectors = Field<SCTLR, Bit::Bit13, 1>;            /**< V:高位异常向量(0xFFFF0000) */
+    using RoundRobinReplacement = Field<SCTLR, Bit::Bit14, 1>;  /**< RR:round-robin 替换 */
+    using ThumbInterworkingDisable = Field<SCTLR, Bit::Bit15, 1>; /**< L4:抑制加载到 PC 时切 Thumb */
 };
 
 /**
@@ -140,7 +140,7 @@ struct DACR : FieldAccess<DACR> {
      * @tparam N 域编号(0..15)。
      */
     template <uint32_t N>
-    using Domain = Field<DACR, 2 * N, 2, DomainAccess>;
+    using Domain = Field<DACR, static_cast<Bit>(2 * N), 2, DomainAccess>;
 };
 
 /**

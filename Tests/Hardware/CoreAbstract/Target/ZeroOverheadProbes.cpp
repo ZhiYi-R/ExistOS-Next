@@ -22,9 +22,9 @@ using Mmio = Register<std::uint32_t, 0x80070000>;
 using AliasReg =
     RegisterWithSetClearToggle<std::uint32_t, 0x80070000, 0x80070004, 0x80070008,
                                0x8007000C>;
-using LowByte = Field<Mmio, 0, 8>;   /**< 位[7:0] */
-using HighNibble = Field<Mmio, 8, 4>; /**< 位[11:8] */
-using AliasField = Field<AliasReg, 8, 4>; /**< 带别名后端上的位[11:8] */
+using LowByte = Field<Mmio, Bit::Bit0, 8>;   /**< 位[7:0] */
+using HighNibble = Field<Mmio, Bit::Bit8, 4>; /**< 位[11:8] */
+using AliasField = Field<AliasReg, Bit::Bit8, 4>; /**< 带别名后端上的位[11:8] */
 
 extern "C" {
 

@@ -15,7 +15,7 @@ using namespace LowLevel;
 
 using RegA = Register<std::uint32_t, 0x80000000>;
 using RegB = Register<std::uint32_t, 0x80000010>;
-using FieldOfB = Field<RegB, 0, 4>; // 属于 RegB
+using FieldOfB = Field<RegB, Bit::Bit0, 4>; // 属于 RegB
 
 int main() {
     // 用 RegA 写 RegB 的字段:违反"字段必须属于本寄存器"。

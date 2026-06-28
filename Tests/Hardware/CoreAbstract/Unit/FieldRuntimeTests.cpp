@@ -15,6 +15,7 @@
 
 #include <cstdint>
 
+using LowLevel::Bit;
 using LowLevel::Field;
 using TestSupport::MemoryBackend;
 
@@ -31,16 +32,16 @@ struct TagFullWidth;
 struct TagHalfword;
 
 using GeneralBackend = MemoryBackend<TagGeneral>;
-using GeneralField = Field<GeneralBackend, 4, 3>; /**< 位[6:4]，掩码 0x70 */
+using GeneralField = Field<GeneralBackend, Bit::Bit4, 3>; /**< 位[6:4]，掩码 0x70 */
 
 } // namespace
 
 TEST_CASE(getMaskIsCompileTimeAndCorrect) {
     // GetMask 是 consteval，这里同时核对它在运行期上下文也取到同值。
     CHECK_EQUAL(GeneralField::GetMask(), 0x70u);
-    CHECK_EQUAL((Field<GeneralBackend, 0, 1>::GetMask()), 0x1u);
-    CHECK_EQUAL((Field<GeneralBackend, 31, 1>::GetMask()), 0x80000000u);
-    CHECK_EQUAL((Field<GeneralBackend, 8, 8>::GetMask()), 0xFF00u);
+    CHECK_EQUAL((Field<GeneralBackend, Bit::Bit0, 1>::GetMask()), 0x1u);
+    CHECK_EQUAL((Field<GeneralBackend, Bit::Bit31, 1>::GetMask()), 0x80000000u);
+    CHECK_EQUAL((Field<GeneralBackend, Bit::Bit8, 8>::GetMask()), 0xFF00u);
 }
 
 TEST_CASE(shiftedAlignsAndMasksValue) {
@@ -66,7 +67,7 @@ TEST_CASE(writeTruncatesToFieldWidth) {
 
 TEST_CASE(writePreservesNeighbouringBits) {
     using PreserveBackend = MemoryBackend<TagPreserve>;
-    using MiddleField = Field<PreserveBackend, 4, 3>; // 0x70
+    using MiddleField = Field<PreserveBackend, Bit::Bit4, 3>; // 0x70
     PreserveBackend::Reset(0xFFFFFFFFu);              // 全 1 背景
     PreserveBackend::WriteField<MiddleField>(0x2u);   // 仅改 [6:4]
     // 期望：[6:4] = 010，其余保持 1 → 0xFFFFFFAF
@@ -75,7 +76,7 @@ TEST_CASE(writePreservesNeighbouringBits) {
 
 TEST_CASE(setClearToggleAffectOnlyField) {
     using Backend = MemoryBackend<TagSetClearToggle>;
-    using TargetField = Field<Backend, 4, 3>; // 0x70
+    using TargetField = Field<Backend, Bit::Bit4, 3>; // 0x70
 
     Backend::Reset(0x0000000Fu); // 低 4 位为 1，字段区为 0
     Backend::SetField<TargetField>();
@@ -94,7 +95,7 @@ TEST_CASE(setClearToggleAffectOnlyField) {
 TEST_CASE(aliasedBackendFieldSetClearToggleMatchesRmwSemantics) {
     // 带 SET/CLR/TOG 别名的后端:字段级位操作走原子别名分支,结果须与 RMW 路径等价。
     using Backend = TestSupport::MemoryBackendWithSetClearToggle<TagAliasField>;
-    using TargetField = Field<Backend, 4, 3>; // 0x70
+    using TargetField = Field<Backend, Bit::Bit4, 3>; // 0x70
 
     Backend::Reset(0x0000000Fu);
     Backend::SetField<TargetField>();
@@ -112,7 +113,7 @@ TEST_CASE(aliasedBackendFieldSetClearToggleMatchesRmwSemantics) {
 
 TEST_CASE(predicatesReflectFieldState) {
     using Backend = MemoryBackend<TagPredicate>;
-    using TargetField = Field<Backend, 4, 3>;
+    using TargetField = Field<Backend, Bit::Bit4, 3>;
 
     Backend::Reset(0x00u);
     CHECK(!Backend::FieldIsSet<TargetField>());
@@ -127,7 +128,7 @@ TEST_CASE(predicatesReflectFieldState) {
 TEST_CASE(enumTypedFieldRoundTrips) {
     enum class Speed : std::uint32_t { Slow = 0, Medium = 1, Fast = 2, Turbo = 3 };
     using Backend = MemoryBackend<TagEnum>;
-    using SpeedField = Field<Backend, 4, 2, Speed>; // 位[5:4]
+    using SpeedField = Field<Backend, Bit::Bit4, 2, Speed>; // 位[5:4]
 
     Backend::Reset(0);
     Backend::WriteField<SpeedField>(Speed::Fast);
@@ -139,7 +140,7 @@ TEST_CASE(enumTypedFieldRoundTrips) {
 
 TEST_CASE(fullWidthFieldUsesAllOnesMask) {
     using Backend = MemoryBackend<TagFullWidth>;
-    using WholeField = Field<Backend, 0, 32>;
+    using WholeField = Field<Backend, Bit::Bit0, 32>;
 
     CHECK_EQUAL(WholeField::GetMask(), 0xFFFFFFFFu);
     Backend::Reset(0);
@@ -150,7 +151,7 @@ TEST_CASE(fullWidthFieldUsesAllOnesMask) {
 
 TEST_CASE(halfwordRegisterWidthRespected) {
     using Backend = MemoryBackend<TagHalfword, std::uint16_t>;
-    using HighNibble = Field<Backend, 12, 4>; // 位[15:12]，掩码 0xF000
+    using HighNibble = Field<Backend, Bit::Bit12, 4>; // 位[15:12]，掩码 0xF000
 
     CHECK_EQUAL(HighNibble::GetMask(), static_cast<std::uint16_t>(0xF000u));
     Backend::Reset(static_cast<std::uint16_t>(0x0FFFu));

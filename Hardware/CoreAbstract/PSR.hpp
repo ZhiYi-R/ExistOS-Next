@@ -48,11 +48,11 @@ struct Cpsr : FieldAccess<Cpsr> {
         asm volatile("msr cpsr_f, %0" : : "r"(value) : "cc");
     }
 
-    using Negative = Field<Cpsr, 31, 1>; /**< N:负标志 */
-    using Zero = Field<Cpsr, 30, 1>;     /**< Z:零标志 */
-    using Carry = Field<Cpsr, 29, 1>;    /**< C:进位标志 */
-    using Overflow = Field<Cpsr, 28, 1>; /**< V:溢出标志 */
-    using Saturate = Field<Cpsr, 27, 1>; /**< Q:饱和标志(DSP) */
+    using Negative = Field<Cpsr, Bit::Bit31, 1>; /**< N:负标志 */
+    using Zero = Field<Cpsr, Bit::Bit30, 1>;     /**< Z:零标志 */
+    using Carry = Field<Cpsr, Bit::Bit29, 1>;    /**< C:进位标志 */
+    using Overflow = Field<Cpsr, Bit::Bit28, 1>; /**< V:溢出标志 */
+    using Saturate = Field<Cpsr, Bit::Bit27, 1>; /**< Q:饱和标志(DSP) */
 };
 
 /**

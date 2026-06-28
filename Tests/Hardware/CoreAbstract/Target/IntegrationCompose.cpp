@@ -22,8 +22,8 @@ using UartData = Register<std::uint32_t, 0x80070000>;
 using UartControl =
     RegisterWithSetClearToggle<std::uint32_t, 0x80070030, 0x80070034, 0x80070038,
                                0x8007003C>;
-using TxFifoLevel = Field<UartData, 0, 8>;  /**< TX FIFO 计数 */
-using RxFifoLevel = Field<UartData, 16, 8>; /**< RX FIFO 计数 */
+using TxFifoLevel = Field<UartData, Bit::Bit0, 8>;  /**< TX FIFO 计数 */
+using RxFifoLevel = Field<UartData, Bit::Bit16, 8>; /**< RX FIFO 计数 */
 
 /* DACR 域配置的强类型用法 */
 enum class SpeedSetting : std::uint32_t { Slow = 0, Fast = 1 };

@@ -78,9 +78,9 @@ static_assert(!HasSetClearToggle<ReadOnlyAlias>,
               "只读别名寄存器不应暴露 Set/Clear/Toggle");
 
 /* ===================== Field 可绑定于各类 Backend ===================== */
-static_assert(Field<PlainReadWrite, 0, 8>::GetMask() == 0xFFu);
-static_assert(Field<SCTLR, 0, 1>::GetMask() == 0x1u);
-static_assert(Field<Cpsr, 31, 1>::GetMask() == 0x80000000u);
+static_assert(Field<PlainReadWrite, Bit::Bit0, 8>::GetMask() == 0xFFu);
+static_assert(Field<SCTLR, Bit::Bit0, 1>::GetMask() == 0x1u);
+static_assert(Field<Cpsr, Bit::Bit31, 1>::GetMask() == 0x80000000u);
 
 /* ============ Readable / Writable Backend 拆分满足性 ============ */
 static_assert(ReadableBackend<PlainReadWrite> && WritableBackend<PlainReadWrite>,
@@ -100,16 +100,16 @@ concept CanWriteField = requires(typename FieldType::ValueType value) {
     RegisterBackend::template WriteField<FieldType>(value);
 };
 
-using ReadOnlyMmioField = Field<PlainReadOnly, 0, 8>;
-using MainIdField = Field<MainID, 0, 4>; // 只读 CP15 寄存器也能绑定字段
+using ReadOnlyMmioField = Field<PlainReadOnly, Bit::Bit0, 8>;
+using MainIdField = Field<MainID, Bit::Bit0, 4>; // 只读 CP15 寄存器也能绑定字段
 static_assert(ReadOnlyMmioField::GetMask() == 0xFFu, "只读后端字段掩码照常 consteval");
 static_assert(CanReadField<PlainReadOnly, ReadOnlyMmioField> &&
                   !CanWriteField<PlainReadOnly, ReadOnlyMmioField>,
               "只读后端只暴露 ReadField、不暴露 WriteField");
 static_assert(CanReadField<MainID, MainIdField> && !CanWriteField<MainID, MainIdField>,
               "只读 CP15 字段只可读(无 WriteField)");
-static_assert(CanReadField<PlainReadWrite, Field<PlainReadWrite, 0, 8>> &&
-                  CanWriteField<PlainReadWrite, Field<PlainReadWrite, 0, 8>>,
+static_assert(CanReadField<PlainReadWrite, Field<PlainReadWrite, Bit::Bit0, 8>> &&
+                  CanWriteField<PlainReadWrite, Field<PlainReadWrite, Bit::Bit0, 8>>,
               "RW 后端字段 ReadField/WriteField 皆可用");
 
 } // namespace

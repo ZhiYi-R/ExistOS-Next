@@ -12,6 +12,7 @@
 
 #include <cstdint>
 
+using LowLevel::Bit;
 using LowLevel::Field;
 using TestSupport::MemoryBackend;
 
@@ -23,8 +24,8 @@ struct TagPreserveOutside;
 struct TagSingle;
 
 using ShiftedBackend = MemoryBackend<TagShifted>;
-using LowField = Field<ShiftedBackend, 0, 4>;  /**< 位[3:0] */
-using HighField = Field<ShiftedBackend, 8, 4>; /**< 位[11:8] */
+using LowField = Field<ShiftedBackend, Bit::Bit0, 4>;  /**< 位[3:0] */
+using HighField = Field<ShiftedBackend, Bit::Bit8, 4>; /**< 位[11:8] */
 
 } // namespace
 
@@ -36,9 +37,9 @@ TEST_CASE(shiftedAlignsValueToField) {
 
 TEST_CASE(writeFieldsCombinesIntoSingleValue) {
     using Backend = MemoryBackend<TagCombine>;
-    using NibbleZero = Field<Backend, 0, 4>;  // 0x000F
-    using NibbleTwo = Field<Backend, 8, 4>;   // 0x0F00
-    using NibbleFour = Field<Backend, 16, 4>; // 0x0F0000
+    using NibbleZero = Field<Backend, Bit::Bit0, 4>;  // 0x000F
+    using NibbleTwo = Field<Backend, Bit::Bit8, 4>;   // 0x0F00
+    using NibbleFour = Field<Backend, Bit::Bit16, 4>; // 0x0F0000
 
     Backend::Reset(0);
     Backend::WriteFields<NibbleZero, NibbleTwo, NibbleFour>(0x1u, 0x2u, 0x3u);
@@ -47,8 +48,8 @@ TEST_CASE(writeFieldsCombinesIntoSingleValue) {
 
 TEST_CASE(writeFieldsPreservesBitsOutsideAllFields) {
     using Backend = MemoryBackend<TagPreserveOutside>;
-    using LowNibble = Field<Backend, 0, 4>;  // 0x000F
-    using HighNibble = Field<Backend, 8, 4>; // 0x0F00
+    using LowNibble = Field<Backend, Bit::Bit0, 4>;  // 0x000F
+    using HighNibble = Field<Backend, Bit::Bit8, 4>; // 0x0F00
 
     // 背景含字段并集(0x0F0F)之外的位,必须原样保留。
     Backend::Reset(0xA5A5A5A5u);
@@ -60,7 +61,7 @@ TEST_CASE(writeFieldsPreservesBitsOutsideAllFields) {
 
 TEST_CASE(writeFieldsSingleFieldEquivalentToFieldWrite) {
     using Backend = MemoryBackend<TagSingle>;
-    using OnlyField = Field<Backend, 4, 3>;
+    using OnlyField = Field<Backend, Bit::Bit4, 3>;
 
     Backend::Reset(0xFFFFFFFFu);
     Backend::WriteFields<OnlyField>(0x2u);
