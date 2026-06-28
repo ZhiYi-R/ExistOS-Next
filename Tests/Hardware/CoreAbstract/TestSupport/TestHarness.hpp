@@ -38,23 +38,23 @@ struct TestCase {
 
 /** @brief 全局用例注册表(inline 函数局部静态，跨 TU 唯一)。 */
 [[nodiscard]] inline std::vector<TestCase>& registry() noexcept {
-    static std::vector<TestCase> cases;
+    static std::vector<TestCase> cases{};
     return cases;
 }
 
 /** @brief 累计执行的断言数。 */
 [[nodiscard]] inline int& checkCountTotal() noexcept {
-    static int count = 0;
+    static int count{0};
     return count;
 }
 /** @brief 累计失败的断言数。 */
 [[nodiscard]] inline int& checkCountFailed() noexcept {
-    static int count = 0;
+    static int count{0};
     return count;
 }
 /** @brief 当前用例是否已出现失败断言。 */
 [[nodiscard]] inline bool& currentCaseFailed() noexcept {
-    static bool failed = false;
+    static bool failed{false};
     return failed;
 }
 
@@ -86,9 +86,9 @@ inline void reportEqualFailure(const char* file, int line, const char* expressio
  * @return 全部通过返回 0，否则返回 1(供 main / CTest 判定)。
  */
 [[nodiscard]] inline int runAll() {
-    const int caseCount = static_cast<int>(registry().size());
+    const int caseCount{static_cast<int>(registry().size())};
     std::printf("运行 %d 个测试用例...\n", caseCount);
-    int failedCases = 0;
+    int failedCases{0};
     for (const TestCase& testCase : registry()) {
         currentCaseFailed() = false;
         testCase.function();
@@ -125,8 +125,8 @@ inline void reportEqualFailure(const char* file, int line, const char* expressio
 #define CHECK_EQUAL(actual, expected)                                                \
     do {                                                                             \
         ++::TestHarness::checkCountTotal();                                          \
-        auto checkActual = (actual);                                                 \
-        auto checkExpected = (expected);                                             \
+        auto checkActual{(actual)};                                                 \
+        auto checkExpected{(expected)};                                             \
         if (!(checkActual == checkExpected)) {                                       \
             ::TestHarness::reportEqualFailure(                                       \
                 __FILE__, __LINE__, #actual " == " #expected,                        \

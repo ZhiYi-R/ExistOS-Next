@@ -155,7 +155,7 @@ class CriticalSection {
 
 public:
     [[gnu::always_inline]] CriticalSection() noexcept
-        : savedState(SaveAndDisableInterrupt()) {}
+        : savedState{SaveAndDisableInterrupt()} {}
     [[gnu::always_inline]] ~CriticalSection() noexcept { RestoreInterrupt(savedState); }
 
     CriticalSection(const CriticalSection&) = delete;
@@ -177,7 +177,7 @@ public:
 template <typename RegisterBackend, typename Operation>
     requires Backend<RegisterBackend>
 [[gnu::always_inline]] inline void ModifyAtomic(Operation&& operation) noexcept {
-    const uint32_t saved = SaveAndDisableInterrupt();
+    const uint32_t saved{SaveAndDisableInterrupt()};
     RegisterBackend::Write(
         static_cast<typename RegisterBackend::ValueType>(operation(RegisterBackend::Read())));
     RestoreInterrupt(saved);

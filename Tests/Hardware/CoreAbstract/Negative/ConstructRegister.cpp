@@ -11,7 +11,7 @@ using namespace LowLevel;
 using DemoRegister = Register<std::uint32_t, 0x1000>;
 
 int main() {
-    DemoRegister instance; // 期望:构造函数已删除,不可编译
+    DemoRegister instance{}; // 期望:构造函数已删除,不可编译
     (void)instance;
     return 0;
 }

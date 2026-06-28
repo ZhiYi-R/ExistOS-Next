@@ -58,7 +58,7 @@ void ProbeEnableInterrupt() { EnableInterrupt(); }             // mrs;bic;msr
 std::uint32_t ProbeSaveAndDisableInterrupt() { return SaveAndDisableInterrupt(); }
 void ProbeRestoreInterrupt(std::uint32_t saved) { RestoreInterrupt(saved); } // 1×msr
 void ProbeCriticalSection(std::uint32_t value) {               // RAII:无 push/pop/sp
-    CriticalSection criticalSection;
+    CriticalSection criticalSection{};
     Mmio::Write(value);
 }
 void ProbeModifyAtomic(std::uint32_t orBits) {                 // 关中断内 RMW,无 bl

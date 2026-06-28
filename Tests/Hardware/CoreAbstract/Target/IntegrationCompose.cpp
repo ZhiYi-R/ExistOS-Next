@@ -32,7 +32,7 @@ extern "C" void IntegrationScenario() {
     /* 1) MMIO 字段读写 + 多字段单次写入 */
     UartData::WriteField<TxFifoLevel>(0u);
     UartData::WriteFields<TxFifoLevel, RxFifoLevel>(0x10u, 0x20u);
-    const std::uint32_t pending = UartData::ReadField<TxFifoLevel>();
+    const std::uint32_t pending{UartData::ReadField<TxFifoLevel>()};
 
     /* 2) 带别名的原子位操作(单条 str,无需关中断) */
     UartControl::Set(0x1u);
@@ -41,7 +41,7 @@ extern "C" void IntegrationScenario() {
 
     /* 3) 关中断临界区内的非原子 RMW */
     {
-        CriticalSection criticalSection;
+        CriticalSection criticalSection{};
         UartData::Modify(/*setBits=*/pending, /*clearBits=*/0xFFu);
     }
 
@@ -61,10 +61,10 @@ extern "C" void IntegrationScenario() {
     DrainWriteBuffer();
 
     /* 7) 中断屏蔽原语 */
-    const std::uint32_t saved = SaveAndDisableInterrupt();
+    const std::uint32_t saved{SaveAndDisableInterrupt()};
     RestoreInterrupt(saved);
 
     /* 8) 特权模式下读取 SPSR(显式 tag) */
-    const Mode interruptedMode = Spsr::GetMode(PrivilegedModeTag{});
+    const Mode interruptedMode{Spsr::GetMode(PrivilegedModeTag{})};
     (void)interruptedMode;
 }

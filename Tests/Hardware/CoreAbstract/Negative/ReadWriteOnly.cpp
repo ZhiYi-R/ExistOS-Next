@@ -11,7 +11,7 @@ using namespace LowLevel;
 using WriteOnlyRegister = Register<std::uint32_t, 0x1000, Access::WriteOnly>;
 
 int main() {
-    volatile std::uint32_t value = WriteOnlyRegister::Read(); // 期望:此处不可编译
+    volatile std::uint32_t value{WriteOnlyRegister::Read()}; // 期望:此处不可编译
     (void)value;
     return 0;
 }

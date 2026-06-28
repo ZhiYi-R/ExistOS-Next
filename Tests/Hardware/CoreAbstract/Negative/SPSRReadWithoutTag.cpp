@@ -11,7 +11,7 @@
 using namespace LowLevel;
 
 int main() {
-    volatile std::uint32_t value = Spsr::Read(); // 期望:缺少 PrivilegedModeTag,不可编译
+    volatile std::uint32_t value{Spsr::Read()}; // 期望:缺少 PrivilegedModeTag,不可编译
     (void)value;
     return 0;
 }

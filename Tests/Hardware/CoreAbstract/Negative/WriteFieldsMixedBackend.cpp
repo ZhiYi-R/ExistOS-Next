@@ -13,13 +13,13 @@ using namespace LowLevel;
 namespace {
 struct BackendA : FieldAccess<BackendA> {
     using ValueType = std::uint32_t;
-    static inline std::uint32_t storage = 0;
+    static inline std::uint32_t storage{0};
     static std::uint32_t Read() noexcept { return storage; }
     static void Write(std::uint32_t value) noexcept { storage = value; }
 };
 struct BackendB : FieldAccess<BackendB> {
     using ValueType = std::uint32_t;
-    static inline std::uint32_t storage = 0;
+    static inline std::uint32_t storage{0};
     static std::uint32_t Read() noexcept { return storage; }
     static void Write(std::uint32_t value) noexcept { storage = value; }
 };

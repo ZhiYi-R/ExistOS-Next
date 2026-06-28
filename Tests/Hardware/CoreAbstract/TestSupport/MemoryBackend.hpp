@@ -27,7 +27,7 @@ namespace TestSupport {
 template <typename Tag, typename Value = std::uint32_t>
 struct MemoryBackend : LowLevel::FieldAccess<MemoryBackend<Tag, Value>> {
     using ValueType = Value;            /**< 暴露给 Backend/Field 的值类型 */
-    static inline Value storage = Value{0}; /**< 模拟寄存器的存储格 */
+    static inline Value storage{0}; /**< 模拟寄存器的存储格 */
 
     /** @brief 读当前值。 */
     [[nodiscard]] static Value Read() noexcept { return storage; }
@@ -49,7 +49,7 @@ template <typename Tag, typename Value = std::uint32_t>
 struct MemoryBackendWithSetClearToggle
     : LowLevel::FieldAccess<MemoryBackendWithSetClearToggle<Tag, Value>> {
     using ValueType = Value;            /**< 暴露给 Backend/Field 的值类型 */
-    static inline Value storage = Value{0}; /**< 模拟寄存器的存储格 */
+    static inline Value storage{0}; /**< 模拟寄存器的存储格 */
 
     /** @brief 读当前值。 */
     [[nodiscard]] static Value Read() noexcept { return storage; }

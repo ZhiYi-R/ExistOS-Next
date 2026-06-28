@@ -176,9 +176,10 @@ struct FieldAccess {
         static_assert((std::same_as<typename FieldTypes::BackendType, Derived> && ...),
                       "WriteFields: 所有字段必须属于本寄存器");
         using RegisterType = typename Derived::ValueType;
-        constexpr RegisterType combinedMask = (FieldTypes::GetMask() | ... | RegisterType{0});
-        const RegisterType combinedValue =
-            (static_cast<RegisterType>(FieldTypes::Shifted(values)) | ... | RegisterType{0});
+        constexpr RegisterType combinedMask{
+            static_cast<RegisterType>((FieldTypes::GetMask() | ... | RegisterType{0}))};
+        const RegisterType combinedValue{static_cast<RegisterType>(
+            (static_cast<RegisterType>(FieldTypes::Shifted(values)) | ... | RegisterType{0}))};
         Derived::Write(
             static_cast<RegisterType>((Derived::Read() & ~combinedMask) | combinedValue));
     }
