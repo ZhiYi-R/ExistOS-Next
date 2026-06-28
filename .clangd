@@ -13,6 +13,9 @@
 CompileFlags:
   Add:
     - -std=c++23
+    - -IHardware
     - -IHardware/CoreAbstract
+    - -IHardware/Registers
+    - -IHardware/Drivers
     - -ITests/Hardware/CoreAbstract/TestSupport
   CompilationDatabase: .

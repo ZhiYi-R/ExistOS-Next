@@ -28,6 +28,8 @@ import subprocess
 # ============================================================================
 LIBRARY_INCLUDE = "Hardware/CoreAbstract"
 REGISTERS_INCLUDE = "Hardware/Registers"
+DRIVERS_INCLUDE = "Hardware/Drivers"
+BSP_INCLUDE = "Hardware"  # 供驱动以 `#include "Drivers/…"`/`"Registers/…"` 及板级 `"BSP.hpp"`
 TEST_SUPPORT_INCLUDE = "Tests/Hardware/CoreAbstract/TestSupport"
 
 TEST_BASE = Dir("#Tests/Hardware/CoreAbstract")
@@ -37,10 +39,36 @@ NEGATIVE_DIR = TEST_BASE.Dir("Negative")
 TARGET_DIR = TEST_BASE.Dir("Target")
 LIBRARY_DIR = Dir("#" + LIBRARY_INCLUDE)
 REGISTERS_DIR = Dir("#" + REGISTERS_INCLUDE)
+HARDWARE_DIR = Dir("#" + BSP_INCLUDE)
+DRIVERS_TEST_BASE = Dir("#Tests/Hardware/Drivers")
 BUILD_DIR = Dir("#build")
 
 # 受测的五个头(用于目标侧"逐头自洽"编译)。
 LIBRARY_HEADERS = ["Bit", "Concepts", "Field", "Register", "PSR", "CP15"]
+
+# 驱动层受测头(目标侧逐头自洽 -Werror 编译);路径相对 Hardware/,故含 `Drivers/` 前缀,
+# 板级合成根写作 `BSP`。每项 X 对应源文件 Hardware/X.hpp,探针为 `#include "X.hpp"`。
+DRIVERS_HEADERS = [
+    "Drivers/Common/ResetAndClockGate",
+    "Drivers/Common/DmaDescriptor",
+    "Drivers/Common/DmaChannel",
+    "Drivers/Common/CacheMaintenance",
+    "Drivers/CLKCTRL",
+    "Drivers/PINCTRL",
+    "Drivers/GPIO",
+    "Drivers/ICOLL",
+    "Drivers/TIMROT",
+    "Drivers/RTC",
+    "Drivers/LRADC",
+    "Drivers/POWER",
+    "Drivers/PWM",
+    "Drivers/UARTDBG",
+    "Drivers/APBH",
+    "Drivers/LCDIF",
+    "Drivers/GPMI",
+    "Drivers/Keyboard",
+    "BSP",
+]
 
 # 目标侧编译标志:ARM926EJ-S / ARMv5TEJ。
 TARGET_ARCH_FLAGS = ["-march=armv5te", "-mcpu=arm926ej-s", "-ffreestanding"]
@@ -69,7 +97,8 @@ hostEnv["CC"] = hostEnv["CXX"]
 hostEnv.Replace(LINK="$CXX")
 hostEnv.Append(
     CXXFLAGS=["-std=c++23", "-Wall", "-Wextra",
-              "-I", LIBRARY_INCLUDE, "-I", TEST_SUPPORT_INCLUDE],
+              "-I", LIBRARY_INCLUDE, "-I", TEST_SUPPORT_INCLUDE,
+              "-I", REGISTERS_INCLUDE, "-I", DRIVERS_INCLUDE, "-I", BSP_INCLUDE],
     LINKFLAGS=["-std=c++23"],
 )
 
@@ -163,6 +192,34 @@ PROBE_ASSERTIONS = [
     ("ProbeSPSRRead", "present", r"mrs\s+r[0-9]+, SPSR", None, "Spsr::Read = mrs ...,SPSR"),
     ("ProbeSPSRWrite", "present", r"msr\s+SPSR", None, "Spsr::Write = msr SPSR_..."),
     ("ProbeSPSRGetMode", "count", r"\bmrs\b", 1, "Spsr::GetMode 含 1×mrs"),
+]
+
+# 驱动层零开销断言:对应 Tests/Hardware/Drivers/Target/DriverZeroOverheadProbes.cpp。
+# 与 CoreAbstract 的 PROBE_ASSERTIONS 分开,经 PROBE_ASSERTION_SET 覆盖传给同一 TargetProbe
+# builder(否则缺符号会互判失败)。GPIO/外设字段的原子置清在带 SET/CLR/TOG 别名的后端上
+# 应分派到单条 str,且无 RMW 回读(无带偏移 ldr)。
+DRIVER_PROBE_ASSERTIONS = [
+    # ---- GPIO 方向/电平:单条原子 str→别名,无回读 ----
+    ("ProbeGpioConfigureAsOutput", "count", r"\bstr\b", 1, "GPIO 配输出 = 单条 str→DOE SET 别名"),
+    ("ProbeGpioConfigureAsOutput", "absent", r"ldr\s+r[0-9]+, \[r[0-9]+, #", None,
+     "GPIO 配输出无 RMW 回读"),
+    ("ProbeGpioConfigureAsInput", "count", r"\bstr\b", 1, "GPIO 配输入 = 单条 str→DOE CLR 别名"),
+    ("ProbeGpioSetHigh", "count", r"\bstr\b", 1, "GPIO 置高 = 单条 str→DOUT SET 别名"),
+    ("ProbeGpioSetHigh", "absent", r"ldr\s+r[0-9]+, \[r[0-9]+, #", None, "GPIO 置高无 RMW 回读"),
+    ("ProbeGpioSetLow", "count", r"\bstr\b", 1, "GPIO 置低 = 单条 str→DOUT CLR 别名"),
+    ("ProbeGpioToggle", "count", r"\bstr\b", 1, "GPIO 翻转 = 单条 str→DOUT TOG 别名"),
+    # ---- GPIO 读:单条带偏移 ldr 间接访存,无写 ----
+    ("ProbeGpioRead", "count", r"\bstr\b", 0, "GPIO 读不含写"),
+    ("ProbeGpioRead", "count", r"ldr\s+r[0-9]+, \[r[0-9]+, #", 1,
+     "GPIO 读 = 单条带偏移 ldr 间接访存"),
+    # ---- 外设模块时钟门控 / 字段原子置清:单条原子 str→别名 ----
+    ("ProbeLcdifEnableClock", "count", r"\bstr\b", 1, "LCDIF 开时钟 = 单条 str→CLKGATE CLR 别名"),
+    ("ProbeLcdifEnableClock", "absent", r"ldr\s+r[0-9]+, \[r[0-9]+, #", None, "LCDIF 开时钟无 RMW 回读"),
+    ("ProbeLcdifAssertReset", "count", r"\bstr\b", 1, "LCDIF 拉 LCD 复位 = 单条 str→CLR 别名"),
+    ("ProbeLcdifRun", "count", r"\bstr\b", 1, "LCDIF 启动 = 单条 str→RUN SET 别名"),
+    ("ProbeGpmiEnableEcc", "count", r"\bstr\b", 1, "GPMI 开 ECC = 单条 str→SET 别名"),
+    ("ProbeGpmiEnableEcc", "absent", r"ldr\s+r[0-9]+, \[r[0-9]+, #", None, "GPMI 开 ECC 无 RMW 回读"),
+    ("ProbeGpmiSetNandMode", "count", r"\bstr\b", 1, "GPMI 设 NAND 模式 = 单条 str→GPMI_MODE CLR 别名"),
 ]
 
 # 全局红线:整段反汇编不得出现(任一探针被 outline 成调用,或出现 ARMv6+ 指令)。
@@ -267,13 +324,15 @@ def targetProbeAction(target, source, env):
         return 1
     disassembly = disassembleResult.stdout
 
+    # 断言集可经 PROBE_ASSERTION_SET 覆盖(驱动探针用 DRIVER_PROBE_ASSERTIONS),默认用 CoreAbstract。
+    assertions = env.get("PROBE_ASSERTION_SET") or PROBE_ASSERTIONS
     failures = []
     # 全局红线
     for pattern, description in GLOBAL_FORBIDDEN:
         if countMatchingLines(disassembly.splitlines(), pattern) > 0:
             failures.append(description)
     # 逐探针断言
-    for symbol, kind, pattern, expected, description in PROBE_ASSERTIONS:
+    for symbol, kind, pattern, expected, description in assertions:
         block = extractSymbolBlock(disassembly, symbol)
         if not block:
             failures.append("%s —— 未在反汇编中找到符号 %s" % (description, symbol))
@@ -368,6 +427,23 @@ for source in sourcesIn(NEGATIVE_DIR):
     hostEnv.AlwaysBuild(passed)
     negativeNodes.append(passed)
 
+# --- 主机:驱动层单元 + 编译期断言(独立 build 子目录,复用 CoreAbstract 的 TestSupport) ---
+for category in ("Unit", "CompileTime"):
+    buildCategory = "Drivers" + category
+    for source in sourcesIn(DRIVERS_TEST_BASE.Dir(category)):
+        objectFile = hostEnv.Object(outputFor(source, buildCategory, ".o").abspath, source)
+        program = hostEnv.Program(outputFor(source, buildCategory, "").abspath, objectFile)
+        hostProgramNodes.append(program)
+        passed = hostEnv.RunHostTest(outputFor(source, buildCategory, ".passed"), program)
+        hostEnv.AlwaysBuild(passed)
+        hostTestNodes.append(passed)
+
+# --- 主机:驱动层负向编译 ---
+for source in sourcesIn(DRIVERS_TEST_BASE.Dir("Negative")):
+    passed = hostEnv.NegativeCompile(outputFor(source, "DriversNegative", ".passed"), source)
+    hostEnv.AlwaysBuild(passed)
+    negativeNodes.append(passed)
+
 # --- 目标:零开销 / 组合 / 逐头自洽(缺工具链则跳过) ---
 if haveTargetToolchain:
     probes = targetEnv.TargetProbe(
@@ -395,6 +471,33 @@ if haveTargetToolchain:
                         Action(writeSelfContained, "生成自洽探针 %s.hpp" % header))
         passed = targetEnv.TargetCompileOnly(
             BUILD_DIR.Dir("SelfContained").File(header + ".passed"), generatedSource)
+        targetEnv.AlwaysBuild(passed)
+        targetNodes.append(passed)
+
+    # 驱动层零开销核对:用驱动专属断言集(经 PROBE_ASSERTION_SET 覆盖传入)。
+    driverProbeSource = DRIVERS_TEST_BASE.Dir("Target").File("DriverZeroOverheadProbes.cpp")
+    if driverProbeSource.exists():
+        driverProbes = targetEnv.TargetProbe(
+            outputFor(driverProbeSource, "DriversTarget", ".passed"), driverProbeSource,
+            PROBE_ASSERTION_SET=DRIVER_PROBE_ASSERTIONS)
+        targetEnv.AlwaysBuild(driverProbes)
+        targetNodes.append(driverProbes)
+
+    # 驱动层逐头自洽:生成 `#include "<h>.hpp"\nint main(){}` 以 -Werror 目标编译。
+    # 头名含 `/`,生成文件名以 `_` 代之;源依赖落在 Hardware/<h>.hpp。
+    for header in DRIVERS_HEADERS:
+        safeName = header.replace("/", "_")
+        generatedSource = BUILD_DIR.Dir("SelfContainedDrivers").File(safeName + ".cpp")
+
+        def writeDriverSelfContained(target, source, env, header=header):
+            with open(target[0].abspath, "w") as out:
+                out.write('#include "%s.hpp"\nint main() { return 0; }\n' % header)
+            return 0
+
+        hostEnv.Command(generatedSource, HARDWARE_DIR.File(header + ".hpp"),
+                        Action(writeDriverSelfContained, "生成驱动自洽探针 %s.hpp" % header))
+        passed = targetEnv.TargetCompileOnly(
+            BUILD_DIR.Dir("SelfContainedDrivers").File(safeName + ".passed"), generatedSource)
         targetEnv.AlwaysBuild(passed)
         targetNodes.append(passed)
 

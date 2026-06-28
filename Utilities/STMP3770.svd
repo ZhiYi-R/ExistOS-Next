@@ -804,7 +804,7 @@
       <baseAddress>0x80004000</baseAddress>
       <addressBlock>
         <offset>0x0</offset>
-        <size>0x330</size>
+        <size>0x4400</size>
         <usage>registers</usage>
       </addressBlock>
       <registers>
@@ -1019,6 +1019,145 @@
               <bitWidth>4</bitWidth>
             <access>read-only</access></field>
           </fields>
+        </register>
+        <register>
+          <dim>8</dim>
+          <dimIncrement>0x70</dimIncrement>
+          <name>CH%s_CURCMDAR</name>
+          <description>DMA 通道当前命令描述符物理地址(只读,DMA 引擎执行时自动更新)。</description>
+          <addressOffset>0x4040</addressOffset>
+          <access>read-only</access>
+          <fields>
+            <field>
+              <name>CMD_ADDR</name>
+              <description>当前命令描述符的 32 位物理地址。</description><bitOffset>0</bitOffset>
+              <bitWidth>32</bitWidth>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <dim>8</dim>
+          <dimIncrement>0x70</dimIncrement>
+          <name>CH%s_NXTCMDAR</name>
+          <description>DMA 通道下一命令描述符物理地址(读写,软件写入待执行描述符链首地址)。</description>
+          <addressOffset>0x4050</addressOffset>
+          <fields>
+            <field>
+              <name>CMD_ADDR</name>
+              <description>下一命令描述符的 32 位物理地址。</description><bitOffset>0</bitOffset>
+              <bitWidth>32</bitWidth>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <dim>8</dim>
+          <dimIncrement>0x70</dimIncrement>
+          <name>CH%s_CMD</name>
+          <description>DMA 通道当前命令字(只读,镜像正在执行描述符的 CMD 字)。</description>
+          <addressOffset>0x4060</addressOffset>
+          <access>read-only</access>
+          <fields>
+            <field>
+              <name>COMMAND</name>
+              <description>传输方向：0=不传输，1=外设→内存(DMA_WRITE)，2=内存→外设(DMA_READ)，3=条件分支(DMA_SENSE)。</description><bitOffset>0</bitOffset>
+              <bitWidth>2</bitWidth>
+            </field>
+            <field>
+              <name>CHAIN</name>
+              <description>置位则完成后继续取 NEXT 指向的下一描述符。</description><bitOffset>2</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+            <field>
+              <name>IRQONCMPLT</name>
+              <description>置位则描述符完成后产生通道命令完成中断。</description><bitOffset>3</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+            <field>
+              <name>NANDLOCK</name>
+              <description>置位则把 GPMI 锁定给本通道直到解锁。</description><bitOffset>4</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+            <field>
+              <name>NANDWAIT4READY</name>
+              <description>置位则等待 NAND R/B 就绪信号后再继续。</description><bitOffset>5</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+            <field>
+              <name>SEMAPHORE</name>
+              <description>置位则完成后递减通道信号量。</description><bitOffset>6</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+            <field>
+              <name>WAIT4ENDCMD</name>
+              <description>置位则等待外设结束命令握手后再推进描述符。</description><bitOffset>7</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+            <field>
+              <name>HALTONTERMINATE</name>
+              <description>置位则在终止时停在当前描述符。</description><bitOffset>8</bitOffset>
+              <bitWidth>1</bitWidth>
+            </field>
+            <field>
+              <name>CMDWORDS</name>
+              <description>随描述符的 PIO 字数。</description><bitOffset>12</bitOffset>
+              <bitWidth>4</bitWidth>
+            </field>
+            <field>
+              <name>XFER_COUNT</name>
+              <description>本次 DMA 传输字节数。</description><bitOffset>16</bitOffset>
+              <bitWidth>16</bitWidth>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <dim>8</dim>
+          <dimIncrement>0x70</dimIncrement>
+          <name>CH%s_BAR</name>
+          <description>DMA 通道缓冲区基址(只读,镜像当前描述符的负载缓冲物理地址)。</description>
+          <addressOffset>0x4070</addressOffset>
+          <access>read-only</access>
+          <fields>
+            <field>
+              <name>ADDRESS</name>
+              <description>负载缓冲的 32 位物理地址。</description><bitOffset>0</bitOffset>
+              <bitWidth>32</bitWidth>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <dim>8</dim>
+          <dimIncrement>0x70</dimIncrement>
+          <name>CH%s_SEMA</name>
+          <description>DMA 通道信号量寄存器(读写,写 INCREMENT_SEMA 踢启动传输,读 PHORE 取剩余待处理描述符数)。</description>
+          <addressOffset>0x4080</addressOffset>
+          <fields>
+            <field>
+              <name>INCREMENT_SEMA</name>
+              <description>写入的值累加到通道信号量,等于排队待执行的描述符个数;非零即启动 DMA。</description><bitOffset>0</bitOffset>
+              <bitWidth>8</bitWidth>
+            </field>
+            <field>
+              <name>PHORE</name>
+              <description>当前信号量计数(只读),为剩余尚未完成的描述符个数。</description><bitOffset>16</bitOffset>
+              <bitWidth>8</bitWidth>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <dim>8</dim>
+          <dimIncrement>0x70</dimIncrement>
+          <name>CH%s_DEBUG1</name>
+          <description>DMA 通道调试寄存器 1(只读,含状态机、FIFO 与命令状态)。</description>
+          <addressOffset>0x4090</addressOffset>
+          <access>read-only</access>
+        </register>
+        <register>
+          <dim>8</dim>
+          <dimIncrement>0x70</dimIncrement>
+          <name>CH%s_DEBUG2</name>
+          <description>DMA 通道调试寄存器 2(只读,含 AHB/APB 已传输字节数)。</description>
+          <addressOffset>0x40A0</addressOffset>
+          <access>read-only</access>
         </register>
       </registers>
     </peripheral>
