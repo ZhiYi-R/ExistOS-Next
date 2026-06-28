@@ -1,3 +1,4 @@
-[submodule "ThirdParty/FreeRTOS"]
-	path = ThirdParty/FreeRTOS
-	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+[submodule "ThirdParty/NuttX"]
+	path = ThirdParty/NuttX
+	url = https://github.com/apache/nuttx.git
+	branch = releases/13.0
