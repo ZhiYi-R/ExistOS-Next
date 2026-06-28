@@ -13,6 +13,8 @@
  * 每个不同的 Tag 类型拥有一份独立存储，便于用例之间互不串扰。
  */
 
+#include "Field.hpp"
+
 #include <cstdint>
 
 namespace TestSupport {
@@ -23,7 +25,7 @@ namespace TestSupport {
  * @tparam Value 寄存器底层无符号整型。
  */
 template <typename Tag, typename Value = std::uint32_t>
-struct MemoryBackend {
+struct MemoryBackend : LowLevel::FieldAccess<MemoryBackend<Tag, Value>> {
     using ValueType = Value;            /**< 暴露给 Backend/Field 的值类型 */
     static inline Value storage = Value{0}; /**< 模拟寄存器的存储格 */
 
@@ -44,7 +46,8 @@ struct MemoryBackend {
  * @tparam Value 寄存器底层无符号整型。
  */
 template <typename Tag, typename Value = std::uint32_t>
-struct MemoryBackendWithSetClearToggle {
+struct MemoryBackendWithSetClearToggle
+    : LowLevel::FieldAccess<MemoryBackendWithSetClearToggle<Tag, Value>> {
     using ValueType = Value;            /**< 暴露给 Backend/Field 的值类型 */
     static inline Value storage = Value{0}; /**< 模拟寄存器的存储格 */
 

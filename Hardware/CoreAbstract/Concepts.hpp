@@ -2,7 +2,6 @@
 #define EXIST_OS_NEXT_CORE_ABSTRACT_CONCEPTS
 
 #include <concepts>
-#include <utility> // std::declval
 
 /**
  * @file Concepts.hpp
@@ -36,9 +35,9 @@ struct PrivilegedModeTag {
 /**
  * @brief 可读后端概念。
  *
- * 任何提供 ValueType + 按值 Read()(noexcept)的类型。Field 的读侧操作
- * (Read/ReadRaw/IsSet/IsValue)只需后端可读即可绑定,因此只读 MMIO/CP15
- * 寄存器也能拥有强类型字段。
+ * 任何提供 ValueType + 按值 Read()(noexcept)的类型。寄存器侧的读类字段操作
+ * (ReadField/ReadFieldRaw/FieldIs/FieldIsSet)只需后端可读即可发起,因此只读
+ * MMIO/CP15 寄存器也能拥有强类型字段。
  *
  * @tparam RegisterBackend 待检测的后端类型。
  */
@@ -57,18 +56,18 @@ concept ReadableBackend = requires {
  * @tparam RegisterBackend 待检测的后端类型。
  */
 template <typename RegisterBackend>
-concept WritableBackend = requires {
+concept WritableBackend = requires(typename RegisterBackend::ValueType value) {
     typename RegisterBackend::ValueType;
     requires std::unsigned_integral<typename RegisterBackend::ValueType>;
-    { RegisterBackend::Write(std::declval<typename RegisterBackend::ValueType>()) } noexcept;
+    { RegisterBackend::Write(value) } noexcept;
 };
 
 /**
  * @brief 统一寄存器后端概念(可读且可写)。
  *
  * 同时满足 ReadableBackend 与 WritableBackend:提供 ValueType + 按值 Read()
- * + 单参 Write(ValueType)(均 noexcept)。Field 的写类/读改写(RMW)操作
- * (Write/Set/Clear/Toggle)以及 WriteFields 都要求 Backend。
+ * + 单参 Write(ValueType)(均 noexcept)。寄存器侧的写类/读改写字段操作
+ * (WriteField/WriteFields/SetField/ClearField/ToggleField)都要求 Backend。
  *
  * 满足者:MMIO Register、CP15 的 RW 寄存器、CPSR。
  * 有意不满足者:SPSR(USR/SYS 下读取 UNPREDICTABLE)、只读 CP15 寄存器
@@ -88,11 +87,12 @@ concept Backend = ReadableBackend<RegisterBackend> && WritableBackend<RegisterBa
  * @tparam RegisterBackend 待检测的后端类型。
  */
 template <typename RegisterBackend>
-concept HasSetClearToggle = Backend<RegisterBackend> && requires {
-    { RegisterBackend::Set(std::declval<typename RegisterBackend::ValueType>()) } noexcept;
-    { RegisterBackend::Clear(std::declval<typename RegisterBackend::ValueType>()) } noexcept;
-    { RegisterBackend::Toggle(std::declval<typename RegisterBackend::ValueType>()) } noexcept;
-};
+concept HasSetClearToggle =
+    Backend<RegisterBackend> && requires(typename RegisterBackend::ValueType bits) {
+        { RegisterBackend::Set(bits) } noexcept;
+        { RegisterBackend::Clear(bits) } noexcept;
+        { RegisterBackend::Toggle(bits) } noexcept;
+    };
 
 } // namespace LowLevel
 

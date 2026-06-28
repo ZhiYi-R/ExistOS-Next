@@ -1,9 +1,10 @@
 /**
  * @file FieldRuntimeTests.cpp
- * @brief Field<> 逻辑核心的主机运行期单元测试(over 内存后端替身)。
+ * @brief 字段读写逻辑核心的主机运行期单元测试(over 内存后端替身)。
  *
- * 覆盖：GetMask / Shifted / Read / ReadRaw / Write / Set / Clear / Toggle /
- * IsSet / IsValue、保留邻位、枚举型字段、满宽(32 位)字段、u16 寄存器宽度。
+ * 覆盖:Field::GetMask / Field::Shifted,以及以寄存器为主体的字段动作
+ * ReadField / ReadFieldRaw / WriteField / SetField / ClearField / ToggleField /
+ * FieldIsSet / FieldIs、保留邻位、枚举型字段、满宽(32 位)字段、u16 寄存器宽度。
  * 这些是全库唯一含算术的逻辑;真实 Register/CP15/CPSR 后端的"单指令"性质由
  * 目标 objdump 验证(见 Target/)。
  */
@@ -23,6 +24,7 @@ namespace {
 struct TagGeneral;
 struct TagPreserve;
 struct TagSetClearToggle;
+struct TagAliasField;
 struct TagPredicate;
 struct TagEnum;
 struct TagFullWidth;
@@ -49,24 +51,24 @@ TEST_CASE(shiftedAlignsAndMasksValue) {
 
 TEST_CASE(writeThenReadRoundTrips) {
     GeneralBackend::Reset(0);
-    GeneralField::Write(0x5u);
+    GeneralBackend::WriteField<GeneralField>(0x5u);
     CHECK_EQUAL(GeneralBackend::storage, 0x50u);
-    CHECK_EQUAL(GeneralField::Read(), 0x5u);
-    CHECK_EQUAL(GeneralField::ReadRaw(), 0x50u);
+    CHECK_EQUAL(GeneralBackend::ReadField<GeneralField>(), 0x5u);
+    CHECK_EQUAL(GeneralBackend::ReadFieldRaw<GeneralField>(), 0x50u);
 }
 
 TEST_CASE(writeTruncatesToFieldWidth) {
     GeneralBackend::Reset(0);
-    GeneralField::Write(0xFFu); // 仅低 3 位有效
+    GeneralBackend::WriteField<GeneralField>(0xFFu); // 仅低 3 位有效
     CHECK_EQUAL(GeneralBackend::storage, 0x70u);
-    CHECK_EQUAL(GeneralField::Read(), 0x7u);
+    CHECK_EQUAL(GeneralBackend::ReadField<GeneralField>(), 0x7u);
 }
 
 TEST_CASE(writePreservesNeighbouringBits) {
     using PreserveBackend = MemoryBackend<TagPreserve>;
     using MiddleField = Field<PreserveBackend, 4, 3>; // 0x70
     PreserveBackend::Reset(0xFFFFFFFFu);              // 全 1 背景
-    MiddleField::Write(0x2u);                         // 仅改 [6:4]
+    PreserveBackend::WriteField<MiddleField>(0x2u);   // 仅改 [6:4]
     // 期望：[6:4] = 010，其余保持 1 → 0xFFFFFFAF
     CHECK_EQUAL(PreserveBackend::storage, 0xFFFFFFAFu);
 }
@@ -76,16 +78,35 @@ TEST_CASE(setClearToggleAffectOnlyField) {
     using TargetField = Field<Backend, 4, 3>; // 0x70
 
     Backend::Reset(0x0000000Fu); // 低 4 位为 1，字段区为 0
-    TargetField::Set();
+    Backend::SetField<TargetField>();
     CHECK_EQUAL(Backend::storage, 0x0000007Fu); // 置满字段，低位不动
 
-    TargetField::Clear();
+    Backend::ClearField<TargetField>();
     CHECK_EQUAL(Backend::storage, 0x0000000Fu); // 清空字段，低位不动
 
     Backend::Reset(0x00000000u);
-    TargetField::Toggle();
+    Backend::ToggleField<TargetField>();
     CHECK_EQUAL(Backend::storage, 0x70u);
-    TargetField::Toggle();
+    Backend::ToggleField<TargetField>();
+    CHECK_EQUAL(Backend::storage, 0x00u);
+}
+
+TEST_CASE(aliasedBackendFieldSetClearToggleMatchesRmwSemantics) {
+    // 带 SET/CLR/TOG 别名的后端:字段级位操作走原子别名分支,结果须与 RMW 路径等价。
+    using Backend = TestSupport::MemoryBackendWithSetClearToggle<TagAliasField>;
+    using TargetField = Field<Backend, 4, 3>; // 0x70
+
+    Backend::Reset(0x0000000Fu);
+    Backend::SetField<TargetField>();
+    CHECK_EQUAL(Backend::storage, 0x0000007Fu); // 经 SET 别名置满字段,低位不动
+
+    Backend::ClearField<TargetField>();
+    CHECK_EQUAL(Backend::storage, 0x0000000Fu); // 经 CLR 别名清空字段,低位不动
+
+    Backend::Reset(0x00000000u);
+    Backend::ToggleField<TargetField>();
+    CHECK_EQUAL(Backend::storage, 0x70u); // 经 TOG 别名翻转
+    Backend::ToggleField<TargetField>();
     CHECK_EQUAL(Backend::storage, 0x00u);
 }
 
@@ -94,13 +115,13 @@ TEST_CASE(predicatesReflectFieldState) {
     using TargetField = Field<Backend, 4, 3>;
 
     Backend::Reset(0x00u);
-    CHECK(!TargetField::IsSet());
-    CHECK(TargetField::IsValue(0x0u));
+    CHECK(!Backend::FieldIsSet<TargetField>());
+    CHECK(Backend::FieldIs<TargetField>(0x0u));
 
-    TargetField::Write(0x5u);
-    CHECK(TargetField::IsSet());
-    CHECK(TargetField::IsValue(0x5u));
-    CHECK(!TargetField::IsValue(0x4u));
+    Backend::WriteField<TargetField>(0x5u);
+    CHECK(Backend::FieldIsSet<TargetField>());
+    CHECK(Backend::FieldIs<TargetField>(0x5u));
+    CHECK(!Backend::FieldIs<TargetField>(0x4u));
 }
 
 TEST_CASE(enumTypedFieldRoundTrips) {
@@ -109,11 +130,11 @@ TEST_CASE(enumTypedFieldRoundTrips) {
     using SpeedField = Field<Backend, 4, 2, Speed>; // 位[5:4]
 
     Backend::Reset(0);
-    SpeedField::Write(Speed::Fast);
+    Backend::WriteField<SpeedField>(Speed::Fast);
     CHECK_EQUAL(Backend::storage, (static_cast<std::uint32_t>(Speed::Fast) << 4));
-    CHECK(SpeedField::Read() == Speed::Fast);
-    CHECK(SpeedField::IsValue(Speed::Fast));
-    CHECK(!SpeedField::IsValue(Speed::Slow));
+    CHECK(Backend::ReadField<SpeedField>() == Speed::Fast);
+    CHECK(Backend::FieldIs<SpeedField>(Speed::Fast));
+    CHECK(!Backend::FieldIs<SpeedField>(Speed::Slow));
 }
 
 TEST_CASE(fullWidthFieldUsesAllOnesMask) {
@@ -122,9 +143,9 @@ TEST_CASE(fullWidthFieldUsesAllOnesMask) {
 
     CHECK_EQUAL(WholeField::GetMask(), 0xFFFFFFFFu);
     Backend::Reset(0);
-    WholeField::Write(0xDEADBEEFu);
+    Backend::WriteField<WholeField>(0xDEADBEEFu);
     CHECK_EQUAL(Backend::storage, 0xDEADBEEFu);
-    CHECK_EQUAL(WholeField::Read(), 0xDEADBEEFu);
+    CHECK_EQUAL(Backend::ReadField<WholeField>(), 0xDEADBEEFu);
 }
 
 TEST_CASE(halfwordRegisterWidthRespected) {
@@ -133,9 +154,9 @@ TEST_CASE(halfwordRegisterWidthRespected) {
 
     CHECK_EQUAL(HighNibble::GetMask(), static_cast<std::uint16_t>(0xF000u));
     Backend::Reset(static_cast<std::uint16_t>(0x0FFFu));
-    HighNibble::Write(0xAu);
+    Backend::WriteField<HighNibble>(0xAu);
     CHECK_EQUAL(Backend::storage, static_cast<std::uint16_t>(0xAFFFu));
-    CHECK_EQUAL(HighNibble::Read(), static_cast<std::uint16_t>(0xAu));
+    CHECK_EQUAL(Backend::ReadField<HighNibble>(), static_cast<std::uint16_t>(0xAu));
 }
 
 TEST_MAIN()

@@ -16,7 +16,7 @@
  * 关键区分:
  *  - 标志位 N/Z/C/V/Q 在标志字节 → Cpsr 作为 Backend,其 Write 用
  *    `msr cpsr_f`,只动标志字节,在 USR 模式也安全。Field<Cpsr,…> 适用。
- *  - 中断屏蔽 I/F、模式 M 在控制字节 → 绝不能走 Field::Set(那会用
+ *  - 中断屏蔽 I/F、模式 M 在控制字节 → 绝不能经 Cpsr 的字段写(那会用
  *    cpsr_f 写错字节)。改用下方专用原语(msr cpsr_c)。
  */
 
@@ -27,7 +27,7 @@ namespace LowLevel {
  *
  * Read 读整字 CPSR;Write 仅写标志字节。只把 N/Z/C/V/Q 暴露为 Field。
  */
-struct Cpsr {
+struct Cpsr : FieldAccess<Cpsr> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
 
     /**

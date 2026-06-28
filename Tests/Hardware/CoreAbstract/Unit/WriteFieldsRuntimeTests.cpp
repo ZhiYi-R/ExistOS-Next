@@ -1,8 +1,9 @@
 /**
  * @file WriteFieldsRuntimeTests.cpp
- * @brief FieldValue / MakeFieldValue / WriteFields 的主机运行期单元测试。
+ * @brief 寄存器主体形式 Reg::WriteFields<F...>(v...) 的主机运行期单元测试。
  *
- * 重点：多字段经一次读-改-写合并写入,且不破坏所有字段并集之外的位。
+ * 重点:多字段经一次读-改-写合并写入,且不破坏所有字段并集之外的位。字段以模板
+ * 实参显式给出,值按序传入;每个字段都在编译期被 static_assert 锚定到本寄存器。
  */
 
 #include "Field.hpp"
@@ -12,25 +13,25 @@
 #include <cstdint>
 
 using LowLevel::Field;
-using LowLevel::MakeFieldValue;
-using LowLevel::WriteFields;
 using TestSupport::MemoryBackend;
 
 namespace {
 
-struct TagFieldValue;
+struct TagShifted;
 struct TagCombine;
 struct TagPreserveOutside;
+struct TagSingle;
 
-using FieldValueBackend = MemoryBackend<TagFieldValue>;
-using LowField = Field<FieldValueBackend, 0, 4>;  /**< 位[3:0] */
-using HighField = Field<FieldValueBackend, 8, 4>; /**< 位[11:8] */
+using ShiftedBackend = MemoryBackend<TagShifted>;
+using LowField = Field<ShiftedBackend, 0, 4>;  /**< 位[3:0] */
+using HighField = Field<ShiftedBackend, 8, 4>; /**< 位[11:8] */
 
 } // namespace
 
-TEST_CASE(fieldValueRawAlignsValue) {
-    CHECK_EQUAL(MakeFieldValue<LowField>(0xAu).Raw(), 0x0Au);
-    CHECK_EQUAL(MakeFieldValue<HighField>(0xAu).Raw(), 0xA00u);
+TEST_CASE(shiftedAlignsValueToField) {
+    // Field::Shifted 把字段值移位归位,是 WriteFields 合并的基础积木。
+    CHECK_EQUAL(LowField::Shifted(0xAu), 0x0Au);
+    CHECK_EQUAL(HighField::Shifted(0xAu), 0xA00u);
 }
 
 TEST_CASE(writeFieldsCombinesIntoSingleValue) {
@@ -40,9 +41,7 @@ TEST_CASE(writeFieldsCombinesIntoSingleValue) {
     using NibbleFour = Field<Backend, 16, 4>; // 0x0F0000
 
     Backend::Reset(0);
-    WriteFields(MakeFieldValue<NibbleZero>(0x1u),
-                MakeFieldValue<NibbleTwo>(0x2u),
-                MakeFieldValue<NibbleFour>(0x3u));
+    Backend::WriteFields<NibbleZero, NibbleTwo, NibbleFour>(0x1u, 0x2u, 0x3u);
     CHECK_EQUAL(Backend::storage, 0x030201u);
 }
 
@@ -53,20 +52,19 @@ TEST_CASE(writeFieldsPreservesBitsOutsideAllFields) {
 
     // 背景含字段并集(0x0F0F)之外的位,必须原样保留。
     Backend::Reset(0xA5A5A5A5u);
-    WriteFields(MakeFieldValue<LowNibble>(0x2u),
-                MakeFieldValue<HighNibble>(0x3u));
+    Backend::WriteFields<LowNibble, HighNibble>(0x2u, 0x3u);
     // 期望:低半字节 5→2、第二半字节 5→3,其余位不变。
     // 0xA5A5A5A5 → 清掉 0x0F0F 得 0xA5A5A0A0,再或入 0x0302 → 0xA5A5A3A2
     CHECK_EQUAL(Backend::storage, 0xA5A5A3A2u);
 }
 
 TEST_CASE(writeFieldsSingleFieldEquivalentToFieldWrite) {
-    using Backend = MemoryBackend<TagFieldValue, std::uint32_t>;
+    using Backend = MemoryBackend<TagSingle>;
     using OnlyField = Field<Backend, 4, 3>;
 
     Backend::Reset(0xFFFFFFFFu);
-    WriteFields(MakeFieldValue<OnlyField>(0x2u));
-    CHECK_EQUAL(Backend::storage, 0xFFFFFFAFu); // 与 Field::Write 同语义
+    Backend::WriteFields<OnlyField>(0x2u);
+    CHECK_EQUAL(Backend::storage, 0xFFFFFFAFu); // 与 WriteField 同语义
 }
 
 TEST_MAIN()

@@ -36,7 +36,7 @@ Tests/Hardware/CoreAbstract/
     MemoryBackend.hpp         # 内存后端测试替身(满足 Backend / HasSetClearToggle)
   Unit/
     FieldRuntimeTests.cpp     # Field 读写/置清翻/谓词/枚举型/满宽/u16
-    WriteFieldsRuntimeTests.cpp # FieldValue/MakeFieldValue/WriteFields 合并写
+    WriteFieldsRuntimeTests.cpp # Reg::WriteFields<F...> 多字段合并写
   CompileTime/
     ConceptAssertions.cpp     # Backend/HasSetClearToggle 满足性 + 访问门控
     MaskAssertions.cpp        # GetMask/Shifted/SCTLR/DACR/CPSR 字段数值

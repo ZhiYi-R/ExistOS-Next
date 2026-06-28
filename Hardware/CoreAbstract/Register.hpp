@@ -2,6 +2,7 @@
 #define EXIST_OS_NEXT_CORE_ABSTRACT_REGISTER
 
 #include "Concepts.hpp"
+#include "Field.hpp"
 #include <cstdint>
 #include <concepts>
 
@@ -28,7 +29,7 @@ namespace LowLevel {
  */
 template <std::unsigned_integral RegisterType, uint32_t BaseAddress,
           Access access = Access::ReadWrite>
-class Register {
+class Register : public FieldAccess<Register<RegisterType, BaseAddress, access>> {
     static_assert(BaseAddress % alignof(RegisterType) == 0, "MMIO 地址未对齐");
 
 public:
@@ -89,7 +90,9 @@ public:
 template <std::unsigned_integral RegisterType, uint32_t BaseAddress,
           uint32_t SetAddress, uint32_t ClearAddress, uint32_t ToggleAddress,
           Access access = Access::ReadWrite>
-class RegisterWithSetClearToggle {
+class RegisterWithSetClearToggle
+    : public FieldAccess<RegisterWithSetClearToggle<
+          RegisterType, BaseAddress, SetAddress, ClearAddress, ToggleAddress, access>> {
     static_assert(BaseAddress % alignof(RegisterType) == 0, "MMIO 地址未对齐");
     static_assert(SetAddress % alignof(RegisterType) == 0, "Set 别名地址未对齐");
     static_assert(ClearAddress % alignof(RegisterType) == 0, "Clear 别名地址未对齐");

@@ -25,7 +25,7 @@ namespace LowLevel {
  *
  * @note 位字段使用全称命名,注释中给出 ARMv5TEJ TRM 的位字母,勿照搬 ARMv7 布局。
  */
-struct SCTLR {
+struct SCTLR : FieldAccess<SCTLR> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
 
     /** @brief 读 SCTLR:单条 mrc。 @return 当前值。 */
@@ -55,7 +55,7 @@ struct SCTLR {
 /**
  * @brief c0,c0,0 —— 主标识寄存器(只读,非 Backend:仅 Read)。
  */
-struct MainID {
+struct MainID : FieldAccess<MainID> {
     using ValueType = uint32_t; /**< 值类型(注意:只读,不满足 Backend) */
     /** @brief 读主 ID。 @return MIDR 值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -68,7 +68,7 @@ struct MainID {
 /**
  * @brief c0,c0,1 —— Cache 类型寄存器(只读,非 Backend)。
  */
-struct CacheType {
+struct CacheType : FieldAccess<CacheType> {
     using ValueType = uint32_t; /**< 值类型(注意:只读,不满足 Backend) */
     /** @brief 读 Cache 类型。 @return CTR 值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -81,7 +81,7 @@ struct CacheType {
 /**
  * @brief c0,c0,2 —— TCM 状态寄存器(只读,非 Backend)。
  */
-struct TCMStatus {
+struct TCMStatus : FieldAccess<TCMStatus> {
     using ValueType = uint32_t; /**< 值类型(注意:只读,不满足 Backend) */
     /** @brief 读 TCM 状态。 @return TCM 状态值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -94,7 +94,7 @@ struct TCMStatus {
 /**
  * @brief c2,c0,0 —— TTBR0 翻译表基址(RW,Backend)。
  */
-struct TTBR0 {
+struct TTBR0 : FieldAccess<TTBR0> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
     /** @brief 读 TTBR0:单条 mrc。 @return 当前值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -122,7 +122,7 @@ enum class DomainAccess : uint32_t {
  *
  * 16 个域,每域 2 位:Domain0[1:0] … Domain15[31:30]。
  */
-struct DACR {
+struct DACR : FieldAccess<DACR> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
     /** @brief 读 DACR:单条 mrc。 @return 当前值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -146,7 +146,7 @@ struct DACR {
 /**
  * @brief c5,c0,0 —— DFSR 数据故障状态寄存器(RW,Backend)。
  */
-struct DFSR {
+struct DFSR : FieldAccess<DFSR> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
     /** @brief 读 DFSR。 @return 当前值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -163,7 +163,7 @@ struct DFSR {
 /**
  * @brief c5,c0,1 —— IFSR 指令故障状态寄存器(RW,Backend)。
  */
-struct IFSR {
+struct IFSR : FieldAccess<IFSR> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
     /** @brief 读 IFSR。 @return 当前值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -180,7 +180,7 @@ struct IFSR {
 /**
  * @brief c6,c0,0 —— FAR 故障地址寄存器(RW,Backend)。
  */
-struct FAR {
+struct FAR : FieldAccess<FAR> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
     /** @brief 读 FAR。 @return 触发故障的地址。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -197,7 +197,7 @@ struct FAR {
 /**
  * @brief c13,c0,0 —— FCSE PID 快速上下文切换扩展 PID(RW,Backend)。
  */
-struct FCSE_PID {
+struct FCSE_PID : FieldAccess<FCSE_PID> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
     /** @brief 读 FCSE PID。 @return 当前值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {
@@ -214,7 +214,7 @@ struct FCSE_PID {
 /**
  * @brief c13,c0,1 —— Context ID 寄存器(RW,Backend)。
  */
-struct ContextID {
+struct ContextID : FieldAccess<ContextID> {
     using ValueType = uint32_t; /**< 暴露给 Backend/Field 的值类型 */
     /** @brief 读 Context ID。 @return 当前值。 */
     [[gnu::always_inline]] [[nodiscard]] static uint32_t Read() noexcept {

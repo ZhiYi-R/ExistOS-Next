@@ -30,9 +30,9 @@ enum class SpeedSetting : std::uint32_t { Slow = 0, Fast = 1 };
 
 extern "C" void IntegrationScenario() {
     /* 1) MMIO 字段读写 + 多字段单次写入 */
-    TxFifoLevel::Write(0u);
-    WriteFields(MakeFieldValue<TxFifoLevel>(0x10u), MakeFieldValue<RxFifoLevel>(0x20u));
-    const std::uint32_t pending = TxFifoLevel::Read();
+    UartData::WriteField<TxFifoLevel>(0u);
+    UartData::WriteFields<TxFifoLevel, RxFifoLevel>(0x10u, 0x20u);
+    const std::uint32_t pending = UartData::ReadField<TxFifoLevel>();
 
     /* 2) 带别名的原子位操作(单条 str,无需关中断) */
     UartControl::Set(0x1u);
@@ -46,13 +46,13 @@ extern "C" void IntegrationScenario() {
     }
 
     /* 4) CP15:启用 I-cache(启动期非原子可接受),运行期需原子时走 ModifyAtomic */
-    SCTLR::InstructionCacheEnable::Set();
+    SCTLR::SetField<SCTLR::InstructionCacheEnable>();
     ModifyAtomic<SCTLR>(
         [](std::uint32_t value) { return value | SCTLR::DataCacheEnable::GetMask(); });
 
     /* 5) DACR 域权限:枚举型字段 */
-    DACR::Domain<0>::Write(DomainAccess::Manager);
-    DACR::Domain<1>::Write(DomainAccess::Client);
+    DACR::WriteField<DACR::Domain<0>>(DomainAccess::Manager);
+    DACR::WriteField<DACR::Domain<1>>(DomainAccess::Client);
 
     /* 6) cache/TLB 维护 */
     CleanInvalidateDataCacheAll();

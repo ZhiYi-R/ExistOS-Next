@@ -24,6 +24,7 @@ using AliasReg =
                                0x8007000C>;
 using LowByte = Field<Mmio, 0, 8>;   /**< 位[7:0] */
 using HighNibble = Field<Mmio, 8, 4>; /**< 位[11:8] */
+using AliasField = Field<AliasReg, 8, 4>; /**< 带别名后端上的位[11:8] */
 
 extern "C" {
 
@@ -38,12 +39,17 @@ void ProbeAliasClear(std::uint32_t bits) { AliasReg::Clear(bits); }   // 1×str�
 void ProbeAliasToggle(std::uint32_t bits) { AliasReg::Toggle(bits); } // 1×str→TOG 别名
 
 /* ====================== Field over MMIO ====================== */
-std::uint32_t ProbeFieldRead() { return LowByte::Read(); }           // ldr + and/lsr
-void ProbeFieldWrite(std::uint32_t value) { LowByte::Write(value); } // 非原子 RMW
-void ProbeFieldSet() { LowByte::Set(); }                            // 非原子 RMW
-void ProbeWriteFields(std::uint32_t low, std::uint32_t high) {       // 单次合并 RMW
-    WriteFields(MakeFieldValue<LowByte>(low), MakeFieldValue<HighNibble>(high));
+std::uint32_t ProbeFieldRead() { return Mmio::ReadField<LowByte>(); }           // ldr + and/lsr
+void ProbeFieldWrite(std::uint32_t value) { Mmio::WriteField<LowByte>(value); } // 非原子 RMW
+void ProbeFieldSet() { Mmio::SetField<LowByte>(); }                            // 非原子 RMW
+void ProbeWriteFields(std::uint32_t low, std::uint32_t high) {                  // 单次合并 RMW
+    Mmio::WriteFields<LowByte, HighNibble>(low, high);
 }
+
+/* 字段级 Set/Clear/Toggle 在带别名后端上应分派到单条原子 str(无回读 RMW)。 */
+void ProbeAliasFieldSet() { AliasReg::SetField<AliasField>(); }       // 1×str→SET 别名
+void ProbeAliasFieldClear() { AliasReg::ClearField<AliasField>(); }   // 1×str→CLR 别名
+void ProbeAliasFieldToggle() { AliasReg::ToggleField<AliasField>(); } // 1×str→TOG 别名
 
 /* ============================ PSR ============================ */
 std::uint32_t ProbeCPSRRead() { return Cpsr::Read(); }         // 1×mrs
@@ -62,7 +68,7 @@ void ProbeModifyAtomic(std::uint32_t orBits) {                 // 关中断内 R
 /* ============================ CP15 ============================ */
 std::uint32_t ProbeSCTLRRead() { return SCTLR::Read(); }       // 1×mrc
 void ProbeSCTLRWrite(std::uint32_t value) { SCTLR::Write(value); } // 1×mcr
-void ProbeSCTLRFieldSet() { SCTLR::InstructionCacheEnable::Set(); } // mrc;orr;mcr
+void ProbeSCTLRFieldSet() { SCTLR::SetField<SCTLR::InstructionCacheEnable>(); } // mrc;orr;mcr
 void ProbeInvalidateInstructionCacheAll() { InvalidateInstructionCacheAll(); } // mcr c7,c5,0
 void ProbeDrainWriteBuffer() { DrainWriteBuffer(); }           // mcr c7,c10,4
 void ProbeInvalidateUnifiedTLBAll() { InvalidateUnifiedTLBAll(); } // mcr c8,c7,0

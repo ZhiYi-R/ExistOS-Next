@@ -111,6 +111,16 @@ PROBE_ASSERTIONS = [
     ("ProbeWriteFields", "count", r"\bstr\b", 1, "WriteFields 合并为单次写(1×str)"),
     ("ProbeWriteFields", "count", r"ldr\s+r[0-9]+, \[r[0-9]+\]", 1,
      "WriteFields 仅一次回读(1×ldr 间接)"),
+    # 字段级 Set/Clear/Toggle 在带别名后端上分派到单条原子 str,且无回读(非 RMW)。
+    ("ProbeAliasFieldSet", "count", r"\bstr\b", 1, "字段级原子 Set = 单条 str→别名"),
+    ("ProbeAliasFieldSet", "absent", r"ldr\s+r[0-9]+, \[r[0-9]+\]", None,
+     "字段级原子 Set 无回读(非 RMW)"),
+    ("ProbeAliasFieldClear", "count", r"\bstr\b", 1, "字段级原子 Clear = 单条 str→别名"),
+    ("ProbeAliasFieldClear", "absent", r"ldr\s+r[0-9]+, \[r[0-9]+\]", None,
+     "字段级原子 Clear 无回读(非 RMW)"),
+    ("ProbeAliasFieldToggle", "count", r"\bstr\b", 1, "字段级原子 Toggle = 单条 str→别名"),
+    ("ProbeAliasFieldToggle", "absent", r"ldr\s+r[0-9]+, \[r[0-9]+\]", None,
+     "字段级原子 Toggle 无回读(非 RMW)"),
     # ---- PSR ----
     ("ProbeCPSRRead", "count", r"\bmrs\b", 1, "Cpsr::Read = 单条 mrs"),
     ("ProbeCPSRRead", "count", r"\bmsr\b", 0, "Cpsr::Read 不含 msr"),

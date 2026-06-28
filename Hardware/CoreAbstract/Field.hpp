@@ -6,24 +6,26 @@
 
 /**
  * @file Field.hpp
- * @brief 强类型位域模板:绑定后端寄存器,提供 consteval 掩码与零开销读写。
+ * @brief 强类型位域描述符(纯数据类)+ 寄存器侧字段访问 CRTP mixin。
+ *
+ * 设计:Field 是纯描述符——只描述一个字段的偏移/位宽/值类型,以及它归属哪个
+ * 后端寄存器,自身不含任何动作。一切读写都以寄存器为主体发起,体现字段的归属:
+ *   CTRL::Reg::WriteField<CTRL::FOO>(value);
+ *   auto v = CTRL::Reg::ReadField<CTRL::FOO>();
+ * 这些动作由 FieldAccess mixin 注入到寄存器后端,并在编译期 static_assert
+ * 字段确属本寄存器,从类型层面挡掉"拿别的寄存器的字段来读写"。
  */
 
 namespace LowLevel {
 
 /**
- * @brief 强类型位域(模板类)。
+ * @brief 强类型位域描述符(纯数据类,无动作)。
  *
- * 绑定到一个后端(MMIO Register / CP15 寄存器 / CPSR),用编译期已知的
- * 偏移/位宽描述一个字段。对外提供 consteval 的 GetMask(),以及零开销的
- * 读/写/置位/清位/翻转。各操作按后端能力门控:读类(Read/ReadRaw/IsSet/
- * IsValue)只需后端可读,故只读寄存器也能拥有强类型字段;写类与读改写
- * (Write/Set/Clear/Toggle)要求后端可读且可写。
+ * 绑定到一个后端(MMIO Register / CP15 寄存器 / CPSR)只为表达"该字段属于谁"
+ * 并借其取底层整型宽度。对外仅提供 consteval 的 GetMask()/Shifted() 与位信息;
+ * 读/写/置/清/翻转一律经所属寄存器的 ReadField/WriteField/... 完成(见 FieldAccess)。
  *
- * @note Set/Clear/Toggle/Write 在 ARMv5 上是"读-改-写",非原子(本核无
- *       LDREX/STREX)。需要原子时用 Set/Clear/Toggle 别名或 CriticalSection。
- *
- * @tparam RegisterBackend 后端寄存器类型(须可读或可写)。
+ * @tparam RegisterBackend 所属后端寄存器类型(须可读或可写)。
  * @tparam Offset          字段最低位。
  * @tparam Width           字段位宽。
  * @tparam FieldValueType  字段值的强类型(默认与寄存器同宽的无符号整型,可传枚举)。
@@ -32,9 +34,9 @@ template <typename RegisterBackend, uint32_t Offset, uint32_t Width,
           typename FieldValueType = typename RegisterBackend::ValueType>
     requires(ReadableBackend<RegisterBackend> || WritableBackend<RegisterBackend>)
 struct Field {
-    using BackendType = RegisterBackend;                       /**< 所属后端 */
-    using RegisterType = typename RegisterBackend::ValueType;  /**< 寄存器底层无符号整型 */
-    using ValueType = FieldValueType;                          /**< 字段值的强类型 */
+    using BackendType = RegisterBackend;                      /**< 所属后端 */
+    using RegisterType = typename RegisterBackend::ValueType; /**< 寄存器底层无符号整型 */
+    using ValueType = FieldValueType;                         /**< 字段值的强类型 */
 
     static constexpr uint32_t BitOffset = Offset; /**< 字段最低位 */
     static constexpr uint32_t BitWidth = Width;   /**< 字段位宽 */
@@ -65,67 +67,56 @@ struct Field {
         return static_cast<RegisterType>(
             (static_cast<RegisterType>(value) << BitOffset) & GetMask());
     }
+};
 
+/**
+ * @brief 字段访问 CRTP mixin:给寄存器后端注入"以寄存器为主体"的字段读写。
+ *
+ * 让具体寄存器后端(Derived)继承本类,即可用成员语法对它的字段做强类型读写:
+ *   Derived::ReadField<F>()  / ReadFieldRaw<F>() / FieldIs<F>(v) / FieldIsSet<F>()
+ *   Derived::WriteField<F>(v)/ WriteFields<F...>(v...) / SetField<F>() / ClearField<F>() / ToggleField<F>()
+ * 每个动作都 static_assert F 属于 Derived(本寄存器),在编译期挡掉跨寄存器误用——
+ * 这正是 Field 作为纯描述符、动作收归寄存器后才得以表达的归属语义。
+ *
+ * 读类(ReadField/ReadFieldRaw/FieldIs/FieldIsSet)只要求后端可读,故只读寄存器
+ * 也能读其字段;写类/读改写(WriteField/WriteFields/SetField/ClearField/ToggleField)
+ * 要求后端可读且可写。空基类、全 static + always_inline,零开销。
+ *
+ * @note WriteField/WriteFields 是非原子 RMW(本核无 LDREX/STREX)。SetField/
+ *       ClearField/ToggleField 在带 SET/CLR/TOG 别名的后端上自动编成单条原子
+ *       str,否则退回非原子 RMW;后者需原子时请用 CriticalSection。
+ *
+ * @tparam Derived 派生的寄存器后端类型(CRTP 自身)。
+ */
+template <typename Derived>
+struct FieldAccess {
     /**
      * @brief 读取字段并右移归位:ldr/mrc + and + lsr。
      * @return 字段当前值。
      */
-    [[gnu::always_inline]] [[nodiscard]] static ValueType Read() noexcept
-        requires ReadableBackend<RegisterBackend>
+    template <typename FieldType>
+    [[gnu::always_inline]] [[nodiscard]] static typename FieldType::ValueType
+    ReadField() noexcept
+        requires ReadableBackend<Derived>
     {
-        return static_cast<ValueType>((RegisterBackend::Read() & GetMask()) >> BitOffset);
+        static_assert(std::same_as<typename FieldType::BackendType, Derived>,
+                      "ReadField: 字段必须属于本寄存器");
+        return static_cast<typename FieldType::ValueType>(
+            (Derived::Read() & FieldType::GetMask()) >> FieldType::BitOffset);
     }
 
     /**
      * @brief 读取字段的原始掩码值(仍在原位,便于按位合并)。
      * @return 寄存器读数与字段掩码相与的结果。
      */
-    [[gnu::always_inline]] [[nodiscard]] static RegisterType ReadRaw() noexcept
-        requires ReadableBackend<RegisterBackend>
+    template <typename FieldType>
+    [[gnu::always_inline]] [[nodiscard]] static typename FieldType::RegisterType
+    ReadFieldRaw() noexcept
+        requires ReadableBackend<Derived>
     {
-        return RegisterBackend::Read() & GetMask();
-    }
-
-    /**
-     * @brief 写入字段值(非原子 RMW:读 + bic + orr + 写)。
-     * @param value 待写入的字段值。
-     */
-    [[gnu::always_inline]] static void Write(ValueType value) noexcept
-        requires Backend<RegisterBackend>
-    {
-        RegisterBackend::Write(static_cast<RegisterType>(
-            (RegisterBackend::Read() & ~GetMask()) | Shifted(value)));
-    }
-
-    /** @brief 整字段置 1(非原子 RMW,3 指令)。 */
-    [[gnu::always_inline]] static void Set() noexcept
-        requires Backend<RegisterBackend>
-    {
-        RegisterBackend::Write(static_cast<RegisterType>(RegisterBackend::Read() | GetMask()));
-    }
-
-    /** @brief 整字段清 0(非原子 RMW,3 指令)。 */
-    [[gnu::always_inline]] static void Clear() noexcept
-        requires Backend<RegisterBackend>
-    {
-        RegisterBackend::Write(static_cast<RegisterType>(RegisterBackend::Read() & ~GetMask()));
-    }
-
-    /** @brief 整字段翻转(非原子 RMW,3 指令)。 */
-    [[gnu::always_inline]] static void Toggle() noexcept
-        requires Backend<RegisterBackend>
-    {
-        RegisterBackend::Write(static_cast<RegisterType>(RegisterBackend::Read() ^ GetMask()));
-    }
-
-    /**
-     * @brief 字段是否非零。
-     * @return 字段任一位为 1 时返回 true。
-     */
-    [[gnu::always_inline]] [[nodiscard]] static bool IsSet() noexcept
-        requires ReadableBackend<RegisterBackend>
-    {
-        return (RegisterBackend::Read() & GetMask()) != 0;
+        static_assert(std::same_as<typename FieldType::BackendType, Derived>,
+                      "ReadFieldRaw: 字段必须属于本寄存器");
+        return Derived::Read() & FieldType::GetMask();
     }
 
     /**
@@ -133,70 +124,115 @@ struct Field {
      * @param value 期望值。
      * @return 相等时返回 true。
      */
-    [[gnu::always_inline]] [[nodiscard]] static bool IsValue(ValueType value) noexcept
-        requires ReadableBackend<RegisterBackend>
+    template <typename FieldType>
+    [[gnu::always_inline]] [[nodiscard]] static bool
+    FieldIs(typename FieldType::ValueType value) noexcept
+        requires ReadableBackend<Derived>
     {
-        return Read() == value;
+        return ReadField<FieldType>() == value;
     }
-};
-
-/**
- * @brief 一个字段及其待写入值的绑定,供 WriteFields 合并写入。
- * @tparam FieldType 目标字段类型。
- */
-template <typename FieldType>
-struct FieldValue {
-    using FieldTypeAlias = FieldType;       /**< 目标字段类型 */
-    typename FieldType::ValueType value;    /**< 待写入的字段值 */
 
     /**
-     * @brief 取已移位到位的寄存器位模式。
-     * @return 该字段值对应的寄存器位。
+     * @brief 字段是否非零。
+     * @return 字段任一位为 1 时返回 true。
      */
-    [[gnu::always_inline]] [[nodiscard]] constexpr typename FieldType::RegisterType
-    Raw() const noexcept {
-        return FieldType::Shifted(value);
+    template <typename FieldType>
+    [[gnu::always_inline]] [[nodiscard]] static bool FieldIsSet() noexcept
+        requires ReadableBackend<Derived>
+    {
+        static_assert(std::same_as<typename FieldType::BackendType, Derived>,
+                      "FieldIsSet: 字段必须属于本寄存器");
+        return (Derived::Read() & FieldType::GetMask()) != 0;
+    }
+
+    /**
+     * @brief 写入单个字段(非原子 RMW:读 + bic + orr + 写)。
+     * @param value 待写入的字段值。
+     */
+    template <typename FieldType>
+    [[gnu::always_inline]] static void
+    WriteField(typename FieldType::ValueType value) noexcept
+        requires Backend<Derived>
+    {
+        static_assert(std::same_as<typename FieldType::BackendType, Derived>,
+                      "WriteField: 字段必须属于本寄存器");
+        using RegisterType = typename Derived::ValueType;
+        Derived::Write(static_cast<RegisterType>(
+            (Derived::Read() & ~FieldType::GetMask()) | FieldType::Shifted(value)));
+    }
+
+    /**
+     * @brief 一次 RMW 合并写入多个字段(同属本寄存器)。
+     * @tparam FieldTypes 目标字段(显式给出,均须属于本寄存器)。
+     * @param values 与 FieldTypes 一一对应的字段值。
+     */
+    template <typename... FieldTypes>
+    [[gnu::always_inline]] static void
+    WriteFields(typename FieldTypes::ValueType... values) noexcept
+        requires Backend<Derived>
+    {
+        static_assert(sizeof...(FieldTypes) >= 1, "WriteFields: 至少写入一个字段");
+        static_assert((std::same_as<typename FieldTypes::BackendType, Derived> && ...),
+                      "WriteFields: 所有字段必须属于本寄存器");
+        using RegisterType = typename Derived::ValueType;
+        constexpr RegisterType combinedMask = (FieldTypes::GetMask() | ... | RegisterType{0});
+        const RegisterType combinedValue =
+            (static_cast<RegisterType>(FieldTypes::Shifted(values)) | ... | RegisterType{0});
+        Derived::Write(
+            static_cast<RegisterType>((Derived::Read() & ~combinedMask) | combinedValue));
+    }
+
+    /**
+     * @brief 整字段置 1。带别名后端走单条原子 str→SET,否则非原子 RMW(3 指令)。
+     */
+    template <typename FieldType>
+    [[gnu::always_inline]] static void SetField() noexcept
+        requires Backend<Derived>
+    {
+        static_assert(std::same_as<typename FieldType::BackendType, Derived>,
+                      "SetField: 字段必须属于本寄存器");
+        if constexpr (HasSetClearToggle<Derived>) {
+            Derived::Set(FieldType::GetMask()); // 单条原子 str→SET 别名
+        } else {
+            Derived::Write(
+                static_cast<typename Derived::ValueType>(Derived::Read() | FieldType::GetMask()));
+        }
+    }
+
+    /**
+     * @brief 整字段清 0。带别名后端走单条原子 str→CLR,否则非原子 RMW(3 指令)。
+     */
+    template <typename FieldType>
+    [[gnu::always_inline]] static void ClearField() noexcept
+        requires Backend<Derived>
+    {
+        static_assert(std::same_as<typename FieldType::BackendType, Derived>,
+                      "ClearField: 字段必须属于本寄存器");
+        if constexpr (HasSetClearToggle<Derived>) {
+            Derived::Clear(FieldType::GetMask()); // 单条原子 str→CLR 别名
+        } else {
+            Derived::Write(
+                static_cast<typename Derived::ValueType>(Derived::Read() & ~FieldType::GetMask()));
+        }
+    }
+
+    /**
+     * @brief 整字段翻转。带别名后端走单条原子 str→TOG,否则非原子 RMW(3 指令)。
+     */
+    template <typename FieldType>
+    [[gnu::always_inline]] static void ToggleField() noexcept
+        requires Backend<Derived>
+    {
+        static_assert(std::same_as<typename FieldType::BackendType, Derived>,
+                      "ToggleField: 字段必须属于本寄存器");
+        if constexpr (HasSetClearToggle<Derived>) {
+            Derived::Toggle(FieldType::GetMask()); // 单条原子 str→TOG 别名
+        } else {
+            Derived::Write(
+                static_cast<typename Derived::ValueType>(Derived::Read() ^ FieldType::GetMask()));
+        }
     }
 };
-
-/**
- * @brief 构造一个 FieldValue。
- * @tparam FieldType 目标字段类型。
- * @param value 字段值。
- * @return 绑定好的 FieldValue。
- */
-template <typename FieldType>
-[[gnu::always_inline]] [[nodiscard]] constexpr FieldValue<FieldType>
-MakeFieldValue(typename FieldType::ValueType value) noexcept {
-    return FieldValue<FieldType>{value};
-}
-
-/**
- * @brief 一次 RMW 合并写入多个字段,要求它们属于同一个 Backend。
- *
- * 把首个 FieldValue 单独取出做形参,既能拿到共同 Backend,又避开了
- * "别名模板把参数包展开到固定首形参"这种 clang 拒绝的写法。
- *
- * @param first 第一个字段值(用于推导共同后端)。
- * @param rest  其余字段值。
- */
-template <typename FirstFieldValue, typename... RestFieldValues>
-[[gnu::always_inline]] inline void
-WriteFields(FirstFieldValue first, RestFieldValues... rest) noexcept {
-    using RegisterBackendType = typename FirstFieldValue::FieldTypeAlias::BackendType;
-    static_assert((std::same_as<typename RestFieldValues::FieldTypeAlias::BackendType,
-                                RegisterBackendType> && ...),
-                  "WriteFields: 所有字段必须属于同一个寄存器");
-    using RegisterType = typename RegisterBackendType::ValueType;
-    constexpr RegisterType combinedMask =
-        (FirstFieldValue::FieldTypeAlias::GetMask() | ... |
-         RestFieldValues::FieldTypeAlias::GetMask());
-    const RegisterType combinedValue =
-        (static_cast<RegisterType>(first.Raw()) | ... |
-         static_cast<RegisterType>(rest.Raw()));
-    RegisterBackendType::Write(
-        static_cast<RegisterType>((RegisterBackendType::Read() & ~combinedMask) | combinedValue));
-}
 
 } // namespace LowLevel
 

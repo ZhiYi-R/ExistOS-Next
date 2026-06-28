@@ -6,7 +6,7 @@
  *  1. 哪些真实类型满足 / 不满足 Backend;
  *  2. 哪些满足 HasSetClearToggle;
  *  3. 访问权限门控:RO 无 Write、WO 无 Read、RW 两者皆有——用 requires 表达式
- *     在 SFINAE 友好的上下文里探测,不触发硬错误。
+ *     探测成员是否可调用,不合法即概念取 false,不触发硬错误。
  *
  * 本文件只做编译期检查,不 ODR-use 任何 ARM 内联汇编,故在主机 clang 上亦可编译。
  */
@@ -92,23 +92,25 @@ static_assert(!ReadableBackend<PlainWriteOnly> && WritableBackend<PlainWriteOnly
 static_assert(ReadableBackend<MainID> && !WritableBackend<MainID>,
               "只读 CP15 MainID 仅可读");
 
-/* ====== Field 绑定只读后端:可绑定、读类可用、写类被门控掉 ====== */
-template <typename FieldType>
-concept FieldExposesRead = requires { FieldType::Read(); };
-template <typename FieldType>
-concept FieldExposesWrite =
-    requires(typename FieldType::ValueType value) { FieldType::Write(value); };
+/* ====== 字段动作收归寄存器:读类对只读后端可用、写类被门控掉 ====== */
+template <typename RegisterBackend, typename FieldType>
+concept CanReadField = requires { RegisterBackend::template ReadField<FieldType>(); };
+template <typename RegisterBackend, typename FieldType>
+concept CanWriteField = requires(typename FieldType::ValueType value) {
+    RegisterBackend::template WriteField<FieldType>(value);
+};
 
 using ReadOnlyMmioField = Field<PlainReadOnly, 0, 8>;
 using MainIdField = Field<MainID, 0, 4>; // 只读 CP15 寄存器也能绑定字段
 static_assert(ReadOnlyMmioField::GetMask() == 0xFFu, "只读后端字段掩码照常 consteval");
-static_assert(FieldExposesRead<ReadOnlyMmioField> && !FieldExposesWrite<ReadOnlyMmioField>,
-              "只读后端的 Field 只暴露读、不暴露写");
-static_assert(FieldExposesRead<MainIdField> && !FieldExposesWrite<MainIdField>,
-              "只读 CP15 字段只可读");
-static_assert(FieldExposesRead<Field<PlainReadWrite, 0, 8>> &&
-                  FieldExposesWrite<Field<PlainReadWrite, 0, 8>>,
-              "RW 后端的 Field 读写皆可用");
+static_assert(CanReadField<PlainReadOnly, ReadOnlyMmioField> &&
+                  !CanWriteField<PlainReadOnly, ReadOnlyMmioField>,
+              "只读后端只暴露 ReadField、不暴露 WriteField");
+static_assert(CanReadField<MainID, MainIdField> && !CanWriteField<MainID, MainIdField>,
+              "只读 CP15 字段只可读(无 WriteField)");
+static_assert(CanReadField<PlainReadWrite, Field<PlainReadWrite, 0, 8>> &&
+                  CanWriteField<PlainReadWrite, Field<PlainReadWrite, 0, 8>>,
+              "RW 后端字段 ReadField/WriteField 皆可用");
 
 } // namespace
 
